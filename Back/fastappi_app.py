@@ -1,9 +1,8 @@
-from django.conf import settings  # Configuración de la base de datos (la misma de Django)
+from django.conf import settings
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
 import os
 import django
 import asyncpg
@@ -20,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Modelos Pydantic para el CRUD
 class ProductoCreate(BaseModel):
+    sku: str
     title: str
     description: Optional[str] = None
     price: float
@@ -27,6 +27,7 @@ class ProductoCreate(BaseModel):
     category_id: int
 
 class ProductoUpdate(BaseModel):
+    sku: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
@@ -35,14 +36,13 @@ class ProductoUpdate(BaseModel):
 
 class ProductoResponse(BaseModel):
     id: int
+    sku: str
     title: str
     description: Optional[str]
     price: float
     stock_quantity: int
     category_id: int
     status: str
-    created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -59,7 +59,6 @@ class Database:
     async def connect(self):
         """Conectar a PostgreSQL"""
         try:
-            # Extraer configuración de Django
             db_config = settings.DATABASES['default']
             self.pool = await asyncpg.create_pool(
                 user=db_config['USER'],
@@ -101,7 +100,6 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     await database.connect()
-    await crear_tabla_productos()
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -112,28 +110,6 @@ async def get_db():
     async with database.pool.acquire() as connection:
         yield connection
 
-# Crear tabla de productos si no existe
-async def crear_tabla_productos():
-    try:
-        async with database.pool.acquire() as conn:
-            await conn.execute('''
-                CREATE TABLE IF NOT EXISTS producto (
-                    id SERIAL PRIMARY KEY,
-                    title VARCHAR(100) NOT NULL,
-                    description TEXT,
-                    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
-                    stock_quantity INT NOT NULL CHECK (stock_quantity >= 0),
-                    category_id INT NOT NULL,
-                    status VARCHAR(50) DEFAULT 'activo',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (category_id) REFERENCES categoria(id) ON DELETE CASCADE
-                )
-            ''')
-            logger.info("✅ Tabla 'producto' verificada/creada")
-    except Exception as e:
-        logger.error(f"❌ Error creando tabla: {e}")
-
 # ENDPOINTS CRUD
 
 @app.post("/api/productos/", response_model=ProductoResponse, status_code=status.HTTP_201_CREATED)
@@ -141,12 +117,13 @@ async def crear_producto(producto: ProductoCreate, conn=Depends(get_db)):
     """Crear un nuevo producto"""
     try:
         query = """
-            INSERT INTO producto (title, description, price, stock_quantity, category_id)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, title, description, price, stock_quantity, category_id, status, created_at, updated_at
+            INSERT INTO producto (sku, title, description, price, stock_quantity, category_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, sku, title, description, price, stock_quantity, category_id, status
         """
         result = await conn.fetchrow(
             query, 
+            producto.sku, 
             producto.title, 
             producto.description, 
             producto.price, 
@@ -154,6 +131,8 @@ async def crear_producto(producto: ProductoCreate, conn=Depends(get_db)):
             producto.category_id
         )
         return dict(result)
+    except asyncpg.exceptions.UniqueViolationError:
+        raise HTTPException(status_code=400, detail="El SKU ya existe")
     except Exception as e:
         logger.error(f"Error creando producto: {e}")
         raise HTTPException(status_code=500, detail="Error al crear producto")
@@ -169,14 +148,20 @@ async def obtener_productos(
     try:
         if categoria_id:
             query = """
-                SELECT * FROM producto 
-                WHERE category_id = $1 
+                SELECT id, sku, title, description, price, stock_quantity, category_id, status 
+                FROM producto 
+                WHERE category_id = $3
                 ORDER BY id 
-                LIMIT $2 OFFSET $3
+                LIMIT $1 OFFSET $2
             """
-            results = await conn.fetch(query, categoria_id, limit, skip)
+            results = await conn.fetch(query, limit, skip, categoria_id)
         else:
-            query = "SELECT * FROM producto ORDER BY id LIMIT $1 OFFSET $2"
+            query = """
+                SELECT id, sku, title, description, price, stock_quantity, category_id, status 
+                FROM producto 
+                ORDER BY id 
+                LIMIT $1 OFFSET $2
+            """
             results = await conn.fetch(query, limit, skip)
         
         return [dict(row) for row in results]
@@ -188,7 +173,10 @@ async def obtener_productos(
 async def obtener_producto(producto_id: int, conn=Depends(get_db)):
     """Obtener un producto por ID"""
     try:
-        query = "SELECT * FROM producto WHERE id = $1"
+        query = """
+            SELECT id, sku, title, description, price, stock_quantity, category_id, status 
+            FROM producto WHERE id = $1
+        """
         result = await conn.fetchrow(query, producto_id)
         
         if not result:
@@ -218,6 +206,11 @@ async def actualizar_producto(
         values = []
         field_count = 1
         
+        if producto.sku is not None:
+            fields.append(f"sku = ${field_count}")
+            values.append(producto.sku)
+            field_count += 1
+
         if producto.title is not None:
             fields.append(f"title = ${field_count}")
             values.append(producto.title)
@@ -246,18 +239,19 @@ async def actualizar_producto(
         if not fields:
             raise HTTPException(status_code=400, detail="No se proporcionaron campos para actualizar")
 
-        fields.append("updated_at = CURRENT_TIMESTAMP")
         values.append(producto_id)
         
         update_query = f"""
             UPDATE producto 
             SET {', '.join(fields)}
             WHERE id = ${field_count}
-            RETURNING id, title, description, price, stock_quantity, category_id, status, created_at, updated_at
+            RETURNING id, sku, title, description, price, stock_quantity, category_id, status
         """
         
         result = await conn.fetchrow(update_query, *values)
         return dict(result)
+    except asyncpg.exceptions.UniqueViolationError:
+        raise HTTPException(status_code=400, detail="El SKU ya existe")
     except Exception as e:
         logger.error(f"Error actualizando producto {producto_id}: {e}")
         raise HTTPException(status_code=500, detail="Error al actualizar producto")
@@ -282,14 +276,25 @@ async def eliminar_producto(producto_id: int, conn=Depends(get_db)):
         logger.error(f"Error eliminando producto {producto_id}: {e}")
         raise HTTPException(status_code=500, detail="Error al eliminar producto")
 
-# Endpoints adicionales útiles
-@app.get("/api/productos/categorias/", response_model=List[str])
+# Endpoints adicionales
+@app.get("/api/categorias/", response_model=List[str])
 async def obtener_categorias(conn=Depends(get_db)):
-    """Obtener lista de categorías únicas"""
+    """Obtener lista de categorías"""
     try:
-        query = "SELECT DISTINCT categoria FROM producto ORDER BY categoria"
+        query = "SELECT name FROM categoria ORDER BY id"
         results = await conn.fetch(query)
-        return [row['categoria'] for row in results if row['categoria']]
+        return [row['name'] for row in results if row['name']]
+    except Exception as e:
+        logger.error(f"Error obteniendo categorías: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener categorías")
+
+@app.get("/api/categorias-con-id/", response_model=List[dict])
+async def obtener_categorias_con_id(conn=Depends(get_db)):
+    """Obtener lista de categorías con ID"""
+    try:
+        query = "SELECT id, name FROM categoria ORDER BY id"
+        results = await conn.fetch(query)
+        return [dict(row) for row in results]
     except Exception as e:
         logger.error(f"Error obteniendo categorías: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener categorías")
@@ -304,8 +309,7 @@ async def health_check(conn=Depends(get_db)):
         return {
             "status": "healthy",
             "database": "connected",
-            "total_productos": count,
-            "timestamp": datetime.now().isoformat()
+            "total_productos": count
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -321,7 +325,8 @@ async def root():
             "obtener_producto": "GET /api/productos/{id}",
             "actualizar_producto": "PUT /api/productos/{id}",
             "eliminar_producto": "DELETE /api/productos/{id}",
-            "categorias": "GET /api/productos/categorias/",
+            "categorias": "GET /api/categorias/",
+            "categorias_con_id": "GET /api/categorias-con-id/",
             "health": "GET /health",
             "documentacion": "/docs"
         }
