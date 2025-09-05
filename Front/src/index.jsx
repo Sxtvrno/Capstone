@@ -1,10 +1,14 @@
-import { REACT } from 'react'
-import { ReactDOM } from 'react-dom/client'
-import { App } from './App.jsx'
-import 'bootstrap/dist/css/bootstrap.min.css';
+// src/index.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './Index.css'
 
-const root = ReactDOM.createRoot(document.getElementById('root'))
+// Crear un root para la aplicación (React 18)
+const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
-  <App />
-)
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
