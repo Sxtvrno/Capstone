@@ -3,7 +3,7 @@
 *.log
 *.pot
 *.pyc
-__pycache__/
+Back/Back/__pycache__/
 local_settings.py
 db.sqlite3
 media/
@@ -27,3 +27,4 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .vscode/*
+
