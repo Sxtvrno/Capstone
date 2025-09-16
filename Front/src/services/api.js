@@ -86,6 +86,24 @@ export const addProducto = async (producto, onAuthError) => {
   }
 };
 
+export const updateProducto = async (id, producto, onAuthError) => {
+  const token = localStorage.getItem("token");
+  try {
+    return await axios.put(`${API_URL}/productos/${id}/`, producto, {
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    if (error?.response?.status === 401 && onAuthError) {
+      onAuthError(error);
+    }
+    throw error;
+  }
+};
+
 export const deleteProducto = async (id, onAuthError) => {
   const token = localStorage.getItem("token");
   try {
