@@ -5,8 +5,14 @@ import ProductForm from "./components/ProductForm";
 import ProductList from "./components/ProductList";
 import AuthForm from "./components/AuthForm"; // Asegúrate de tener este componente
 
+const initialProducts = [
+  { id: 1, name: "Producto 1" },
+  { id: 2, name: "Producto 2" },
+];
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [products, setProducts] = useState(initialProducts);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -20,6 +26,10 @@ function App() {
 
   const handleAuth = () => {
     setIsAuthenticated(true);
+  };
+
+  const handleDelete = (id) => {
+    setProducts(products.filter((p) => p.id !== id));
   };
 
   // Si no está autenticado, muestra solo el formulario de autenticación
@@ -39,7 +49,10 @@ function App() {
         <main className="flex-1 bg-gray-100 p-6">
           <Routes>
             <Route path="/" element={<ProductForm />} />
-            <Route path="/productos" element={<ProductList />} />
+            <Route
+              path="/productos"
+              element={<ProductList products={products} onDelete={handleDelete} />}
+            />
           </Routes>
         </main>
       </div>
