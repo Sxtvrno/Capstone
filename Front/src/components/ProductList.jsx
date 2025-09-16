@@ -1,11 +1,14 @@
 // src/components/ProductList.jsx
 import React, { useEffect, useState } from "react";
 import { getProductos, deleteProducto } from "../services/api";
+import EditProductForm from "./EditProductForm";
 
 const ProductList = () => {
   const [productos, setProductos] = useState([]);
   const [search, setSearch] = useState(""); // Estado para la búsqueda
   const [menuOpen, setMenuOpen] = useState(null); // Estado para el menú de acciones
+  const [editModalOpen, setEditModalOpen] = useState(false); // Estado para el modal de edición
+  const [productoEdit, setProductoEdit] = useState(null); // Producto a editar
 
   useEffect(() => {
     getProductos()
@@ -109,9 +112,9 @@ const ProductList = () => {
                           <button
                             className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => {
-                              // Acción editar
                               setMenuOpen(null);
-                              // Aquí puedes agregar la lógica de edición
+                              setProductoEdit(producto);
+                              setEditModalOpen(true);
                             }}
                           >
                             Editar
@@ -143,6 +146,19 @@ const ProductList = () => {
           </tbody>
         </table>
       </div>
+      {/* Modal de edición */}
+      {editModalOpen && productoEdit && (
+        <EditProductForm
+          producto={productoEdit}
+          onClose={() => {
+            setEditModalOpen(false);
+            setProductoEdit(null);
+          }}
+          onUpdate={updated => {
+            setProductos(productos.map(p => p.id === updated.id ? updated : p));
+          }}
+        />
+      )}
       {/* estilos locales para clamp (sin plugin) */}
       <style>{`
         .line-clamp-1 { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }

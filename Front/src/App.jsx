@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/SideBar";
 import ProductForm from "./components/ProductForm";
 import ProductList from "./components/ProductList";
 import AuthForm from "./components/AuthForm"; // Asegúrate de tener este componente
