@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/SideBar";
 import ProductForm from "./components/ProductForm";
 import ProductList from "./components/ProductList";
-import AuthForm from "./components/AuthForm"; // Asegúrate de tener este componente
+import AuthForm from "./components/AuthForm";
+import CustomizeStore from "./components/CustomizeStore";
 
 const initialProducts = [
   { id: 1, name: "Producto 1" },
@@ -53,6 +54,7 @@ function App() {
               path="/productos"
               element={<ProductList products={products} onDelete={handleDelete} />}
             />
+            <Route path="/personaliza" element={<CustomizeStore />} />
           </Routes>
         </main>
       </div>

@@ -10,7 +10,7 @@ const Sidebar = ({ onLogout }) => {
         <Link to="/" className="hover:bg-gray-800 rounded px-3 py-2">Inicio</Link>
         <Link to="/productos" className="hover:bg-gray-800 rounded px-3 py-2">Productos</Link>
         <a href="#" className="hover:bg-gray-800 rounded px-3 py-2">Media</a>
-        <a href="#" className="hover:bg-gray-800 rounded px-3 py-2">Personaliza tu tienda</a>
+  <Link to="/personaliza" className="hover:bg-gray-800 rounded px-3 py-2">Personaliza tu tienda</Link>
         <button
           onClick={onLogout}
           className="hover:bg-gray-800 rounded px-3 py-2 text-left w-full"
