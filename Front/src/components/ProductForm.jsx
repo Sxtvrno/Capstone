@@ -49,59 +49,151 @@ function ProductForm({ onAuthError }) {
   };
 
   return (
-    <div className="product-form">
-      <form onSubmit={handleSubmit}>
-        <h2>Agregar Producto</h2>
+    <div className="w-full max-w-3xl mx-auto">
+  <form
+    onSubmit={handleSubmit}
+    className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-gray-100 p-6 md:p-8 space-y-6"
+  >
+    <div className="space-y-1">
+      <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+        Agregar producto
+      </h2>
+      <p className="text-sm text-gray-500">
+        Completa la información básica, precio, stock y categoría.
+      </p>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="flex flex-col gap-2">
+        <label htmlFor="sku" className="text-sm font-medium text-gray-700">
+          SKU <span className="text-red-500">*</span>
+        </label>
         <input
+          id="sku"
           type="text"
           value={sku}
           onChange={(e) => setSku(e.target.value)}
-          placeholder="SKU"
+          placeholder="EJ: ABC-123"
           required
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition"
         />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="title" className="text-sm font-medium text-gray-700">
+          Título <span className="text-red-500">*</span>
+        </label>
         <input
+          id="title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Título"
+          placeholder="Nombre del producto"
           required
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition"
         />
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Descripción"
-          required
-        />
-        <h3>Precio</h3>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="price" className="text-sm font-medium text-gray-700">
+          Precio
+        </label>
         <input
+          id="price"
           type="number"
+          min="0"
+          step="0.01"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
+          placeholder="0.00"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition"
         />
-        <h3>Stock</h3>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="stockQuantity" className="text-sm font-medium text-gray-700">
+          Stock
+        </label>
         <input
+          id="stockQuantity"
           type="number"
+          min="0"
           value={stockQuantity}
           onChange={(e) => setStockQuantity(e.target.value)}
+          placeholder="0"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition"
         />
-        <h3>Categoria (id)</h3>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="categoryId" className="text-sm font-medium text-gray-700">
+          Categoría (ID)
+        </label>
         <input
+          id="categoryId"
           type="number"
+          min="1"
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
+          placeholder="Ej: 3"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition"
         />
-        <button style={{ margin: "10px 0" }} type="submit">
-          Agregar
-        </button>
-      </form>
-
-      {/* Toast Notification */}
-      {toastVisible && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white p-4 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
-          <p>{toastMessage}</p>
-        </div>
-      )}
+      </div>
     </div>
+
+    <div className="md:col-span-2 flex flex-col gap-2">
+        <label htmlFor="description" className="text-sm font-medium text-gray-700">
+          Descripción <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Describe características, materiales, medidas, etc."
+          required
+          rows={4}
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition resize-y"
+        />
+      </div>
+
+    <div className="pt-2">
+      <button
+        type="submit"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 transition"
+      >
+        Agregar
+      </button>
+    </div>
+  </form>
+
+  {toastVisible && (
+    <div className="fixed bottom-5 right-5 z-50">
+      <div className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-xl bg-green-600 text-white shadow-2xl ring-1 ring-black/5 animate-[slideIn_.3s_ease-out]">
+        <div className="p-4">
+          <p className="text-sm font-medium">{toastMessage}</p>
+        </div>
+        <div className="h-1 w-full bg-green-700/60">
+          <div className="h-full w-full origin-left animate-[growBar_2500ms_linear_forwards] bg-white/70"></div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* estilos locales al componente */}
+  <style>{`
+    @keyframes slideIn {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes growBar {
+      from { transform: scaleX(1); }
+      to { transform: scaleX(0); }
+    }
+    .animate-\\[slideIn_.3s_ease-out\\] { animation: slideIn .3s ease-out; }
+    .animate-\\[growBar_2500ms_linear_forwards\\] { animation: growBar 2500ms linear forwards; }
+  `}</style>
+</div>
+
   );
 }
 

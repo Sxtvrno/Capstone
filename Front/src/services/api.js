@@ -85,3 +85,20 @@ export const addProducto = async (producto, onAuthError) => {
     throw error;
   }
 };
+
+export const deleteProducto = async (id, onAuthError) => {
+  const token = localStorage.getItem("token");
+  try {
+    return await axios.delete(`${API_URL}/productos/${id}/`, {
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    if (error?.response?.status === 401 && onAuthError) {
+      onAuthError(error);
+    }
+    throw error;
+  }
+};
