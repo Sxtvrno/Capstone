@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import AuthForm from "./components/AuthForm";
-import ProductList from "./components/ProductList";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Sidebar from "./components/Sidebar";
 import ProductForm from "./components/ProductForm";
+import ProductList from "./components/ProductList";
+import AuthForm from "./components/AuthForm"; // Asegúrate de tener este componente
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -11,40 +13,37 @@ function App() {
     setIsAuthenticated(!!token);
   }, []);
 
-  // Función para cerrar sesión y limpiar token
   const handleLogout = () => {
     localStorage.removeItem("token");
     setIsAuthenticated(false);
-  };
-
-  // Función para manejar errores de autenticación (ejemplo)
-  const handleAuthError = (error) => {
-    if (error?.response?.status === 401) {
-      handleLogout();
-    }
   };
 
   const handleAuth = () => {
     setIsAuthenticated(true);
   };
 
-  return (
-    <div className="App">
-      {isAuthenticated ? (
-        <>
-          <button
-            onClick={handleLogout}
-            className="fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition font-semibold shadow"
-          >
-            Cerrar sesión
-          </button>
-          <ProductList onAuthError={handleAuthError} />
-          <ProductForm onAuthError={handleAuthError} />
-        </>
-      ) : (
+  // Si no está autenticado, muestra solo el formulario de autenticación
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
         <AuthForm onAuth={handleAuth} />
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  // Si está autenticado, muestra la app normal
+  return (
+    <Router>
+      <div className="flex min-h-screen items-stretch">
+        <Sidebar onLogout={handleLogout} />
+        <main className="flex-1 bg-gray-100 p-6">
+          <Routes>
+            <Route path="/" element={<ProductForm />} />
+            <Route path="/productos" element={<ProductList />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
   );
 }
 

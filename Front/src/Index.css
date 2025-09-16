@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 .product-form {
   @apply max-w-4xl mx-auto p-8 bg-white shadow-xl rounded-xl;
 }
