@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/SideBar";
-import ProductForm from "./components/ProductForm";
 import ProductList from "./components/ProductList";
-import AuthForm from "./components/AuthForm";
+import ProductForm from "./components/ProductForm";
 import CustomizeStore from "./components/CustomizeStore";
+import AuthForm from "./components/AuthForm";
 
 const initialProducts = [
   { id: 1, name: "Producto 1" },
@@ -47,13 +47,16 @@ function App() {
     <Router>
       <div className="flex min-h-screen items-stretch">
         <Sidebar onLogout={handleLogout} />
-        <main className="flex-1 bg-gray-100 p-6">
+        <main className="flex-1 ml-64 p-8 bg-gray-50 min-h-screen">
           <Routes>
-            <Route path="/" element={<ProductForm />} />
+            <Route path="/" element={<AuthForm />} />
             <Route
               path="/productos"
-              element={<ProductList products={products} onDelete={handleDelete} />}
+              element={
+                <ProductList products={products} onDelete={handleDelete} />
+              }
             />
+            <Route path="/productos/nuevo" element={<ProductForm />} />
             <Route path="/personaliza" element={<CustomizeStore />} />
           </Routes>
         </main>
