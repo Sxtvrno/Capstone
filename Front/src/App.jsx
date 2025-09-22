@@ -49,7 +49,7 @@ function App() {
         <Sidebar onLogout={handleLogout} />
         <main className="flex-1 ml-64 p-8 bg-gray-50 min-h-screen">
           <Routes>
-            <Route path="/" element={<AuthForm />} />
+            <Route path="/" element={<ProductForm />} />
             <Route
               path="/productos"
               element={
