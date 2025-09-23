@@ -5,6 +5,7 @@ import ProductList from "./components/ProductList";
 import ProductForm from "./components/ProductForm";
 import CustomizeStore from "./components/CustomizeStore";
 import AuthForm from "./components/AuthForm";
+import MediaManager from "./components/MediaManager";
 
 const initialProducts = [
   { id: 1, name: "Producto 1" },
@@ -57,6 +58,7 @@ function App() {
               }
             />
             <Route path="/productos/nuevo" element={<ProductForm />} />
+            <Route path="/media" element={<MediaManager />} />
             <Route path="/personaliza" element={<CustomizeStore />} />
           </Routes>
         </main>
