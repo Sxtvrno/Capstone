@@ -81,6 +81,16 @@ class ProductoCreate(BaseModel):
     category_id: int
 
 
+class ImagenProductoCreate(BaseModel):
+    url_imagen: str
+
+
+class ImagenProductoResponse(BaseModel):
+    id: int
+    producto_id: int
+    url_imagen: str
+
+
 class ProductoUpdate(BaseModel):
     sku: Optional[str] = None
     title: Optional[str] = None
@@ -826,6 +836,89 @@ async def eliminar_producto(
     except Exception as e:
         logger.error(f"Error eliminando producto {producto_id}: {e}")
         raise HTTPException(status_code=500, detail="Error al eliminar producto")
+
+
+@app.post(
+    "/api/productos/{producto_id}/imagenes", response_model=List[ImagenProductoResponse]
+)
+async def agregar_imagenes_producto(
+    producto_id: int,
+    imagenes: List[ImagenProductoCreate],
+    conn=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Agregar URLs de imágenes a un producto"""
+    logger.info(
+        f"Usuario {current_user['email']} agregando imágenes a producto {producto_id}"
+    )
+    # Verifica que el producto exista
+    check_query = "SELECT id FROM producto WHERE id = $1"
+    exists = await conn.fetchrow(check_query, producto_id)
+    if not exists:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    results = []
+    for imagen in imagenes:
+        insert_query = """
+            INSERT INTO ProductoImagen (producto_id, url_imagen)
+            VALUES ($1, $2)
+            RETURNING id, producto_id, url_imagen
+        """
+        result = await conn.fetchrow(insert_query, producto_id, imagen.url_imagen)
+        results.append(dict(result))
+    return results
+
+
+@app.get(
+    "/api/productos/{producto_id}/imagenes", response_model=List[ImagenProductoResponse]
+)
+async def obtener_imagenes_producto(
+    producto_id: int,
+    conn=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Obtener todas las imágenes asociadas a un producto"""
+    logger.info(
+        f"Usuario {current_user['email']} consultando imágenes de producto {producto_id}"
+    )
+    check_query = "SELECT id FROM producto WHERE id = $1"
+    exists = await conn.fetchrow(check_query, producto_id)
+    if not exists:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    query = """
+        SELECT id, producto_id, url_imagen
+        FROM ProductoImagen
+        WHERE producto_id = $1
+        ORDER BY id
+    """
+    results = await conn.fetch(query, producto_id)
+    return [dict(row) for row in results]
+
+
+@app.delete("/api/productos/imagenes/{imagen_id}", response_model=MensajeResponse)
+async def eliminar_imagen_producto(
+    imagen_id: int,
+    conn=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Eliminar una imagen de producto por su ID"""
+    logger.info(f"Usuario {current_user['email']} eliminando imagen {imagen_id}")
+    try:
+        check_query = "SELECT id FROM ProductoImagen WHERE id = $1"
+        exists = await conn.fetchrow(check_query, imagen_id)
+        if not exists:
+            raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+        delete_query = "DELETE FROM ProductoImagen WHERE id = $1"
+        await conn.execute(delete_query, imagen_id)
+
+        return MensajeResponse(
+            mensaje=f"Imagen {imagen_id} eliminada correctamente", exito=True
+        )
+    except Exception as e:
+        logger.error(f"Error eliminando imagen {imagen_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error al eliminar imagen")
 
 
 # Endpoints públicos (sin autenticación)
