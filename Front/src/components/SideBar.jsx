@@ -22,9 +22,9 @@ const Sidebar = ({ onLogout }) => {
         <Link to="/productos" className="hover:bg-gray-800 rounded px-3 py-2">
           Productos
         </Link>
-        <a href="#" className="hover:bg-gray-800 rounded px-3 py-2">
+        <Link to="/media" className="hover:bg-gray-800 rounded px-3 py-2">
           Media
-        </a>
+        </Link>
         <Link to="/personaliza" className="hover:bg-gray-800 rounded px-3 py-2">
           Personaliza tu tienda
         </Link>
