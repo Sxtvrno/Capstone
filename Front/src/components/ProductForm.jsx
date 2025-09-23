@@ -13,7 +13,7 @@ function ProductForm({ onAuthError }) {
   const [categorias, setCategorias] = useState([]);
 
   useEffect(() => {
-    fetch(`${API_URL}/categorias-con-id/`, {
+    fetch(`${API_URL}/api/categorias-con-id/`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
