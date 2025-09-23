@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { getProductos, deleteProducto } from "../services/api";
+import { getProductos, deleteProducto, API_URL } from "../services/api";
 import EditProductForm from "./EditProductForm";
 import ProductForm from "./ProductForm";
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -42,7 +42,7 @@ const ProductList = () => {
     getProductos()
       .then((res) => setProductos(res.data))
       .catch((err) => console.error(err));
-    fetch("http://localhost:8001/api/categorias-con-id/", {
+    fetch(`${API_URL}/categorias-con-id/`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
@@ -96,7 +96,7 @@ const ProductList = () => {
           {/* Header */}
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500 uppercase tracking-wider text-xs">
-              <th className="px-4 py-3 font-medium">Product Name</th>
+              <th className="px-4 py-3 font-medium">Product name</th>
               <th className="px-4 py-3 font-medium">SKU</th>
               <th className="px-4 py-3 font-medium">Category</th>
               <th className="px-4 py-3 font-medium">Stock</th>

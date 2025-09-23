@@ -1,10 +1,10 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:8001/api";
+export const API_URL = import.meta.env.VITE_BACK_URL;
 
 export const login = async (username, password) => {
   const response = await axios.post(
-    `${API_URL}/auth/login`,
+    `${API_URL}/api/auth/login`,
     {
       username,
       password,
@@ -31,7 +31,7 @@ export const register = async (
   address
 ) => {
   const response = await axios.post(
-    `${API_URL}/auth/register`,
+    `${API_URL}/api/auth/register`,
     {
       email,
       password,
@@ -54,7 +54,7 @@ export const register = async (
 export const getProductos = async (onAuthError) => {
   const token = localStorage.getItem("token");
   try {
-    return await axios.get(`${API_URL}/productos/`, {
+    return await axios.get(`${API_URL}/api/productos/`, {
       headers: {
         accept: "application/json",
         Authorization: `Bearer ${token}`,
@@ -71,7 +71,7 @@ export const getProductos = async (onAuthError) => {
 export const addProducto = async (producto, onAuthError) => {
   const token = localStorage.getItem("token");
   try {
-    return await axios.post(`${API_URL}/productos/`, producto, {
+    return await axios.post(`${API_URL}/api/productos/`, producto, {
       headers: {
         accept: "application/json",
         "Content-Type": "application/json",
@@ -89,7 +89,7 @@ export const addProducto = async (producto, onAuthError) => {
 export const updateProducto = async (id, producto, onAuthError) => {
   const token = localStorage.getItem("token");
   try {
-    return await axios.put(`${API_URL}/productos/${id}/`, producto, {
+    return await axios.put(`${API_URL}/api/productos/${id}/`, producto, {
       headers: {
         accept: "application/json",
         "Content-Type": "application/json",
@@ -107,7 +107,7 @@ export const updateProducto = async (id, producto, onAuthError) => {
 export const deleteProducto = async (id, onAuthError) => {
   const token = localStorage.getItem("token");
   try {
-    return await axios.delete(`${API_URL}/productos/${id}/`, {
+    return await axios.delete(`${API_URL}/api/productos/${id}/`, {
       headers: {
         accept: "application/json",
         Authorization: `Bearer ${token}`,
@@ -123,40 +123,49 @@ export const deleteProducto = async (id, onAuthError) => {
 
 // Subir imágenes (URLs) a un producto
 export const subirImagenesProducto = async (productoId, imagenes, token) => {
-  const response = await fetch(`${API_URL}/productos/${productoId}/imagenes`, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(imagenes), // Ejemplo: [{ url_imagen: "..." }]
-  });
+  const response = await fetch(
+    `${API_URL}/api/productos/${productoId}/imagenes`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(imagenes), // Ejemplo: [{ url_imagen: "..." }]
+    }
+  );
   if (!response.ok) throw new Error("Error al subir imágenes");
   return await response.json();
 };
 
 // Obtener imágenes de un producto
 export const obtenerImagenesProducto = async (productoId, token) => {
-  const response = await fetch(`${API_URL}/productos/${productoId}/imagenes`, {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/productos/${productoId}/imagenes`,
+    {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
   if (!response.ok) throw new Error("Error al obtener imágenes");
   return await response.json();
 };
 
 export const deleteImagenProducto = async (imagenId, token) => {
-  const response = await fetch(`${API_URL}/productos/imagenes/${imagenId}`, {
-    method: "DELETE",
-    headers: {
-      accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/productos/imagenes/${imagenId}`,
+    {
+      method: "DELETE",
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
   if (!response.ok) throw new Error("Error al borrar la imagen");
   return await response.json();
 };

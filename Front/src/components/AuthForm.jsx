@@ -13,6 +13,7 @@ const AuthForm = ({ onAuth }) => {
   const [address, setAddress] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(""); // Nuevo estado
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,13 +21,26 @@ const AuthForm = ({ onAuth }) => {
       if (isLogin) {
         await login(username, password);
         onAuth();
+        setSuccess("");
       } else {
-        await register(email, password, first_name, last_name, phone, address);
+        const response = await register(
+          email,
+          password,
+          first_name,
+          last_name,
+          phone,
+          address
+        );
         setIsLogin(true);
+        setSuccess(
+          response.mensaje ||
+            "Registro exitoso. Revisa tu correo para verificar la cuenta."
+        );
       }
       setError("");
     } catch (err) {
       setError("Error en la autenticación");
+      setSuccess("");
     }
   };
 
@@ -124,6 +138,9 @@ const AuthForm = ({ onAuth }) => {
             : "¿Ya tienes cuenta? Inicia sesión"}
         </button>
         {error && <p className="mt-4 text-red-500 text-center">{error}</p>}
+        {success && (
+          <p className="mt-4 text-green-600 text-center">{success}</p>
+        )}
       </div>
     </div>
   );

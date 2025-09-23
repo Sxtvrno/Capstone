@@ -12,6 +12,9 @@ import logging
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Back.settings")
@@ -28,6 +31,208 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Configuración para hashing de passwords
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# Clase mejorada para envío de correos
+class EmailService:
+    def __init__(self):
+        self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_user = os.getenv("SMTP_USER")
+        self.smtp_pass = os.getenv("SMTP_PASS")
+
+    async def send_email(
+        self, to_email: str, subject: str, body: str, is_html: bool = True
+    ):
+        """Envía un correo electrónico"""
+        try:
+            # Crear mensaje
+            msg = MIMEMultipart()
+            msg["From"] = self.smtp_user
+            msg["To"] = to_email
+            msg["Subject"] = subject
+
+            # Adjuntar cuerpo del mensaje
+            if is_html:
+                msg.attach(MIMEText(body, "html"))
+            else:
+                msg.attach(MIMEText(body, "plain"))
+
+            # Conectar y enviar (usando run_in_threadpool para operaciones bloqueantes)
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+
+            def sync_send():
+                server = smtplib.SMTP(self.smtp_host, self.smtp_port)
+                server.starttls()
+                server.login(self.smtp_user, self.smtp_pass)
+                server.send_message(msg)
+                server.quit()
+
+            # Ejecutar en thread pool para no bloquear el event loop
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as pool:
+                await loop.run_in_executor(pool, sync_send)
+
+            logger.info(f"✅ Correo enviado exitosamente a {to_email}")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error enviando correo a {to_email}: {e}")
+            return False
+
+    async def send_verification_email(self, email: str, token: str):
+        """Envía email de verificación con diseño profesional"""
+        verification_url = (
+            os.getenv("URL_BACK") + f"/api/auth/verify-email?token={token}"
+        )
+
+        subject = "🔐 Verifica tu correo electrónico"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white; }}
+                .content {{ padding: 30px; background: #f9f9f9; }}
+                .button {{ display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+                .footer {{ padding: 20px; text-align: center; font-size: 12px; color: #666; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>¡Bienvenido! 🎉</h1>
+                </div>
+                <div class="content">
+                    <h2>Verifica tu dirección de correo</h2>
+                    <p>Hola,</p>
+                    <p>Gracias por registrarte en nuestra plataforma. Para completar tu registro, por favor verifica tu dirección de correo electrónico haciendo clic en el siguiente botón:</p>
+                    
+                    <div style="text-align: center;">
+                        <a href="{verification_url}" class="button">Verificar mi correo</a>
+                    </div>
+                    
+                    <p>Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+                    <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 3px;">{verification_url}</p>
+                    
+                    <p><strong>Este enlace expirará en 24 horas.</strong></p>
+                    
+                    <p>Si no te registraste en nuestra plataforma, por favor ignora este mensaje.</p>
+                </div>
+                <div class="footer">
+                    <p>Este es un mensaje automático, por favor no respondas a este correo.</p>
+                    <p>&copy; 2024 Tu Empresa. Todos los derechos reservados.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        return await self.send_email(email, subject, html_body)
+
+    async def send_welcome_email(self, email: str, first_name: str):
+        """Envía email de bienvenida después de la verificación"""
+        subject = "¡Bienvenido a nuestra plataforma! 🚀"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); padding: 30px; text-align: center; color: white; }}
+                .content {{ padding: 30px; background: #f9f9f9; }}
+                .feature {{ background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>¡Cuenta verificada exitosamente! ✅</h1>
+                </div>
+                <div class="content">
+                    <h2>Hola {first_name},</h2>
+                    <p>¡Felicidades! Tu cuenta ha sido verificada exitosamente y ahora tienes acceso completo a nuestra plataforma.</p>
+                    
+                    <h3>¿Qué puedes hacer ahora?</h3>
+                    
+                    <div class="feature">
+                        <strong>📦 Gestionar productos</strong>
+                        <p>Accede al panel de administración para gestionar tu inventario.</p>
+                    </div>
+                    
+                    <div class="feature">
+                        <strong>👥 Perfil personalizado</strong>
+                        <p>Completa tu perfil para una mejor experiencia.</p>
+                    </div>
+                    
+                    <div class="feature">
+                        <strong>🔔 Notificaciones</strong>
+                        <p>Recibe alertas importantes sobre tu cuenta.</p>
+                    </div>
+                    
+                    <p>Si tienes alguna pregunta, no dudes en contactar a nuestro equipo de soporte.</p>
+                    
+                    <p>¡Gracias por unirte a nosotros!</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        return await self.send_email(email, subject, html_body)
+
+    async def send_password_reset_email(self, email: str, token: str):
+        """Envía email para restablecer contraseña"""
+        reset_url = os.getenv("URL_BACK") + f"/api/auth/verify-email?token={token}"
+
+        subject = "🔒 Restablecer tu contraseña"
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); padding: 30px; text-align: center; color: white; }}
+                .content {{ padding: 30px; background: #f9f9f9; }}
+                .button {{ display: inline-block; padding: 12px 30px; background: #ff6b6b; color: white; text-decoration: none; border-radius: 5px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Restablecer contraseña</h1>
+                </div>
+                <div class="content">
+                    <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta.</p>
+                    
+                    <div style="text-align: center;">
+                        <a href="{reset_url}" class="button">Restablecer contraseña</a>
+                    </div>
+                    
+                    <p>Si no solicitaste este cambio, por favor ignora este mensaje.</p>
+                    <p><strong>Este enlace expirará en 1 hora.</strong></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        return await self.send_email(email, subject, html_body)
+
+
+# Instancia global del servicio de correo
+email_service = EmailService()
 
 
 # Modelos Pydantic para autenticación
@@ -68,6 +273,15 @@ class RegisterRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
+    new_password: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
     new_password: str
 
 
@@ -174,14 +388,17 @@ app = FastAPI(
 )
 
 # Configurar CORS
+origins = [
+    "http://during-consultant.gl.at.ply.gg:47021",  ## FRONT VITE/PLAYIT
+    "http://147.185.221.18:47021",  ##FRONT VITE/PLAYIT
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8001",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://localhost:5173",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -215,18 +432,8 @@ def create_refresh_token(data: dict):
 
 # Funciones de autenticación
 async def send_verification_email(email: str, token: str):
-    """Función simulada para enviar email de verificación"""
-    # En producción, usarías un servicio como SendGrid, Mailgun, etc.
-    verification_url = f"http://localhost:8001/api/auth/verify-email?token={token}"
-
-    logger.info(f"📧 Email de verificación para {email}")
-    logger.info(f"🔗 URL de verificación: {verification_url}")
-    logger.info(f"🔐 Token: {token}")
-
-    # Aquí iría el código real para enviar el email
-    # import smtplib
-    # from email.mime.text import MIMEText
-    # ... código para enviar email ...
+    """Envía un email de verificación con el token"""
+    return await email_service.send_verification_email(email, token)
 
 
 async def authenticate_user(username: str, password: str, conn) -> Optional[dict]:
@@ -409,17 +616,22 @@ async def register_user(register_data: RegisterRequest, conn=Depends(get_db)):
             verification_token,  # Guardamos el token en la base de datos
         )
 
-        # En una implementación real, aquí enviarías el email
-        # await send_verification_email(register_data.email, verification_token)
-
-        logger.info(
-            f"Token de verificación para {register_data.email}: {verification_token}"
+        # Enviar correo REAL
+        email_sent = await email_service.send_verification_email(
+            register_data.email, verification_token
         )
 
+        if email_sent:
+            email_message = "Usuario registrado exitosamente. Se ha enviado un email de verificación."
+        else:
+            email_message = "Usuario registrado, pero hubo un error al enviar el email de verificación. Contacta al soporte."
+
         return {
-            "message": "Usuario registrado exitosamente. Se ha enviado un email de verificación.",
+            "message": email_message,
             "user": dict(result),
-            "verification_token": verification_token,  # Solo para desarrollo
+            "verification_token": verification_token
+            if not email_sent
+            else None,  # Solo mostrar token si falla el email
         }
 
     except asyncpg.exceptions.UniqueViolationError:
@@ -452,7 +664,7 @@ async def verify_email(token: str, conn=Depends(get_db)):
 
         # Verificar que el token coincida con el guardado en la base de datos
         query = """
-            SELECT id, verification_status, password_reset_token 
+            SELECT id, verification_status, password_reset_token, first_name
             FROM Usuario 
             WHERE email = $1
         """
@@ -481,8 +693,16 @@ async def verify_email(token: str, conn=Depends(get_db)):
         """
 
         result = await conn.fetchrow(update_query, email)
+        user_data = dict(result)
 
-        return {"message": "✅ Email verificado exitosamente", "user": dict(result)}
+        # Enviar correo de bienvenida
+        await email_service.send_welcome_email(email, user["first_name"])
+
+        return {
+            "message": "✅ Email verificado exitosamente",
+            "user": user_data,
+            "welcome_email_sent": True,
+        }
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -624,23 +844,115 @@ async def resend_verification_email(email: str, conn=Depends(get_db)):
         update_query = "UPDATE Usuario SET password_reset_token = $1 WHERE email = $2"
         await conn.execute(update_query, new_verification_token, email)
 
-        # Enviar email (simulado)
-        # await send_verification_email(email, new_verification_token)
-
-        logger.info(
-            f"Nuevo token de verificación para {email}: {new_verification_token}"
+        # Enviar email REAL
+        email_sent = await email_service.send_verification_email(
+            email, new_verification_token
         )
 
-        return {
-            "message": "Email de verificación reenviado",
-            "verification_token": new_verification_token,  # Solo para desarrollo
+        response_data = {
+            "message": "Email de verificación reenviado"
+            if email_sent
+            else "Error al enviar email, contacta al soporte"
         }
+
+        # Solo incluir token en desarrollo si falla el email
+        if not email_sent:
+            response_data["verification_token"] = new_verification_token
+
+        return response_data
 
     except Exception as e:
         logger.error(f"Error reenviando email de verificación: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al reenviar email de verificación",
+        )
+
+
+@app.post("/api/auth/request-password-reset")
+async def request_password_reset(request: PasswordResetRequest, conn=Depends(get_db)):
+    """Solicitar restablecimiento de contraseña"""
+    try:
+        user = await get_user_by_email(request.email, conn)
+        if not user:
+            # Por seguridad, no revelar si el email existe o no
+            return {
+                "message": "Si el email existe, se ha enviado un enlace de restablecimiento"
+            }
+
+        # Generar token de restablecimiento
+        reset_token = create_access_token(
+            data={"sub": request.email, "purpose": "password_reset"},
+            expires_delta=timedelta(hours=1),
+        )
+
+        # Guardar token en la base de datos
+        update_query = "UPDATE Usuario SET password_reset_token = $1 WHERE email = $2"
+        await conn.execute(update_query, reset_token, request.email)
+
+        # Enviar email de restablecimiento
+        await email_service.send_password_reset_email(request.email, reset_token)
+
+        return {"message": "Se ha enviado un enlace de restablecimiento a tu email"}
+
+    except Exception as e:
+        logger.error(f"Error solicitando restablecimiento: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al procesar la solicitud",
+        )
+
+
+@app.post("/api/auth/reset-password")
+async def reset_password(confirm: PasswordResetConfirm, conn=Depends(get_db)):
+    """Restablecer contraseña con token"""
+    try:
+        payload = jwt.decode(confirm.token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        purpose = payload.get("purpose")
+
+        if not email or purpose != "password_reset":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token inválido",
+            )
+
+        # Verificar que el token coincida con la base de datos
+        query = "SELECT id, password_reset_token FROM Usuario WHERE email = $1"
+        user = await conn.fetchrow(query, email)
+
+        if not user or user["password_reset_token"] != confirm.token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token inválido o expirado",
+            )
+
+        # Actualizar contraseña
+        new_hashed_password = get_password_hash(confirm.new_password)
+        update_query = """
+            UPDATE Usuario 
+            SET hash_pwd = $1, password_reset_token = NULL 
+            WHERE email = $2
+        """
+        await conn.execute(update_query, new_hashed_password, email)
+
+        return {"message": "Contraseña restablecida exitosamente"}
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token expirado",
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token inválido",
+        )
+    except Exception as e:
+        logger.error(f"Error restableciendo contraseña: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al restablecer contraseña",
         )
 
 
@@ -970,6 +1282,22 @@ async def obtener_categorias_con_id(conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail="Error al obtener categorías")
 
 
+# Endpoint de prueba para correos
+@app.post("/api/test-email")
+async def test_email(email: str):
+    """Endpoint para probar el envío de correos"""
+    success = await email_service.send_email(
+        email,
+        "✅ Prueba de correo desde FastAPI",
+        "<h1>¡Funciona!</h1><p>El sistema de correos está funcionando correctamente.</p>",
+    )
+
+    return {
+        "success": success,
+        "message": "Correo de prueba enviado" if success else "Error al enviar correo",
+    }
+
+
 # Health check (público)
 @app.get("/health")
 async def health_check(conn=Depends(get_db)):
@@ -994,6 +1322,10 @@ async def root():
             "auth_profile": "GET /api/auth/profile",
             "auth_change_password": "POST /api/auth/change-password",
             "auth_verify_email": "GET /api/auth/verify-email",
+            "auth_resend_verification": "POST /api/auth/resend-verification",
+            "auth_request_password_reset": "POST /api/auth/request-password-reset",
+            "auth_reset_password": "POST /api/auth/reset-password",
+            "test_email": "POST /api/test-email",
             "crear_producto": "POST /api/productos/ (protegido)",
             "obtener_productos": "GET /api/productos/ (protegido)",
             "obtener_producto": "GET /api/productos/{id} (protegido)",

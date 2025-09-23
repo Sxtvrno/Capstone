@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { addProducto } from "../services/api";
+import { addProducto, API_URL } from "../services/api";
 
 function ProductForm({ onAuthError }) {
   const [sku, setSku] = useState("");
@@ -13,7 +13,7 @@ function ProductForm({ onAuthError }) {
   const [categorias, setCategorias] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:8001/api/categorias-con-id/", {
+    fetch(`${API_URL}/categorias-con-id/`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
@@ -48,7 +48,6 @@ function ProductForm({ onAuthError }) {
       setPrice(0);
       setStockQuantity(0);
       setCategoryId(0);
-      
     } catch (error) {
       if (error?.response?.status === 401 && onAuthError) {
         onAuthError(error);
@@ -75,10 +74,7 @@ function ProductForm({ onAuthError }) {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label
-              htmlFor="sku"
-              className="text-xs font-medium text-gray-700"
-            >
+            <label htmlFor="sku" className="text-xs font-medium text-gray-700">
               SKU <span className="text-red-500">*</span>
             </label>
             <input
@@ -168,9 +164,11 @@ function ProductForm({ onAuthError }) {
             </select>
             {categoriaSeleccionada && (
               <div className="text-xs text-gray-500 mt-1">
-                <span className="font-semibold">ID:</span> {categoriaSeleccionada.id}
+                <span className="font-semibold">ID:</span>{" "}
+                {categoriaSeleccionada.id}
                 &nbsp;
-                <span className="font-semibold">Nombre:</span> {categoriaSeleccionada.name}
+                <span className="font-semibold">Nombre:</span>{" "}
+                {categoriaSeleccionada.name}
               </div>
             )}
           </div>
