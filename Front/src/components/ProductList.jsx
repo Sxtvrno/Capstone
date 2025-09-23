@@ -42,7 +42,7 @@ const ProductList = () => {
     getProductos()
       .then((res) => setProductos(res.data))
       .catch((err) => console.error(err));
-    fetch(`${API_URL}/categorias-con-id/`, {
+    fetch(`${API_URL}/api/categorias-con-id/`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
