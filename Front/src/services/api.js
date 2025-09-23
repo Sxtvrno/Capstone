@@ -123,49 +123,40 @@ export const deleteProducto = async (id, onAuthError) => {
 
 // Subir imágenes (URLs) a un producto
 export const subirImagenesProducto = async (productoId, imagenes, token) => {
-  const response = await fetch(
-    `http://localhost:8001/api/productos/${productoId}/imagenes`,
-    {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(imagenes), // Ejemplo: [{ url_imagen: "..." }]
-    }
-  );
+  const response = await fetch(`${API_URL}/productos/${productoId}/imagenes`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(imagenes), // Ejemplo: [{ url_imagen: "..." }]
+  });
   if (!response.ok) throw new Error("Error al subir imágenes");
   return await response.json();
 };
 
 // Obtener imágenes de un producto
 export const obtenerImagenesProducto = async (productoId, token) => {
-  const response = await fetch(
-    `http://localhost:8001/api/productos/${productoId}/imagenes`,
-    {
-      method: "GET",
-      headers: {
-        accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  const response = await fetch(`${API_URL}/productos/${productoId}/imagenes`, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
   if (!response.ok) throw new Error("Error al obtener imágenes");
   return await response.json();
 };
 
 export const deleteImagenProducto = async (imagenId, token) => {
-  const response = await fetch(
-    `http://localhost:8001/api/productos/imagenes/${imagenId}`,
-    {
-      method: "DELETE",
-      headers: {
-        accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  const response = await fetch(`${API_URL}/productos/imagenes/${imagenId}`, {
+    method: "DELETE",
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
   if (!response.ok) throw new Error("Error al borrar la imagen");
   return await response.json();
 };
