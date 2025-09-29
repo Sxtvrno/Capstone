@@ -26,7 +26,7 @@ const Sidebar = ({ onLogout }) => {
           Media
         </Link>
         <Link to="/personaliza" className="hover:bg-gray-800 rounded px-3 py-2">
-          Personaliza tu tienda
+          Personalización
         </Link>
         <button
           onClick={onLogout}

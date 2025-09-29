@@ -3,7 +3,7 @@ import { getProductos } from "../services/api";
 import {
   subirImagenesProducto,
   obtenerImagenesProducto,
-  deleteImagenProducto, // Debes agregar esta función en api.js
+  deleteImagenProducto,
 } from "../services/api";
 
 const MediaManager = ({ onUpload }) => {

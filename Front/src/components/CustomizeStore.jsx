@@ -1,20 +1,69 @@
-import React, { useState, useEffect } from "react";
-import TemplateGrid from "./TemplateGrid";
-import TemplateList from "./TemplateList";
+import React, { useMemo, useState, useEffect } from "react";
+import TemplateGallery from "./TemplateGallery";
 import { getProductos } from "../services/api";
 
+// Descubre todas las plantillas StoreTemplate*.jsx
+function useStoreTemplates() {
+  const mods = import.meta.glob("./StoreTemplate*.jsx", { eager: true });
+  const list = Object.entries(mods)
+    .map(([path, mod]) => {
+      const file = path.split("/").pop() || path;
+      const key = file.replace(".jsx", "");
+      const Component = mod.default || Object.values(mod)[0];
+      return { key, Component };
+    })
+    .filter((t) => typeof t.Component === "function");
+  const map = Object.fromEntries(list.map((t) => [t.key, t]));
+  return { list, map };
+}
+
+// Utilidad para asegurar contraste legible en el header
+function getContrastColor(hex) {
+  try {
+    if (!hex) return "#111827";
+    let c = hex.trim().replace("#", "");
+    if (c.length === 3)
+      c = c
+        .split("")
+        .map((ch) => ch + ch)
+        .join("");
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    if ([r, g, b].some((n) => Number.isNaN(n))) return "#111827";
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 128 ? "#111827" : "#ffffff";
+  } catch {
+    return "#111827";
+  }
+}
+
 const CustomizeStore = () => {
+  const { list, map } = useStoreTemplates();
+  const [selectedKey, setSelectedKey] = useState(() => list[0]?.key || null);
   const [storeName, setStoreName] = useState(
     () => sessionStorage.getItem("storeName") || "Mi Tienda"
   );
   const [editingName, setEditingName] = useState(false);
   const [products, setProducts] = useState([]);
   const [templateType, setTemplateType] = useState("grid");
+  const [showModal, setShowModal] = useState(false);
+
+  // NUEVO: estado para el logo
+  const [logoPreview, setLogoPreview] = useState(
+    () => sessionStorage.getItem("logoPreview") || null
+  );
+
+  // NUEVO: headerColor como estado (antes era const)
+  const [headerColor, setHeaderColor] = useState(
+    () => sessionStorage.getItem("headerColor") || "#ffffff"
+  );
 
   // Guardar el nombre en sessionStorage cuando cambie
   React.useEffect(() => {
     sessionStorage.setItem("storeName", storeName);
   }, [storeName]);
+
   // SVG como logo predeterminado
   const DefaultLogoSVG = (
     <svg
@@ -32,54 +81,44 @@ const CustomizeStore = () => {
       />
     </svg>
   );
-  const [showModal, setShowModal] = useState(false);
-  // Función para determinar si el color es claro u oscuro
-  function getContrastColor(hex) {
-    hex = hex.replace("#", "");
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 128 ? "#222222" : "#ffffff";
-  }
-
-  const [logoPreview, setLogoPreview] = useState(
-    () => sessionStorage.getItem("logoPreview") || null
-  );
-  const [headerColor, setHeaderColor] = useState("#ffffff");
-  const headerTextColor = getContrastColor(headerColor);
-
-  const handleLogoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result);
-        sessionStorage.setItem("logoPreview", reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   // Nueva función para guardar cambios en sessionStorage
   const handleSave = () => {
     sessionStorage.setItem("storeName", storeName);
-    sessionStorage.setItem("logoPreview", logoPreview);
+    sessionStorage.setItem("logoPreview", logoPreview || "");
     sessionStorage.setItem("headerColor", headerColor);
     alert("¡Cambios guardados correctamente!");
   };
 
-  // Recuperar color al cargar
+  // Recuperar color y logo al cargar
   useEffect(() => {
     const savedColor = sessionStorage.getItem("headerColor");
     if (savedColor) setHeaderColor(savedColor);
+    const savedLogo = sessionStorage.getItem("logoPreview");
+    if (savedLogo) setLogoPreview(savedLogo);
   }, []);
+
+  // Si quieres persistir automáticamente cuando cambie el logo/color:
+  // useEffect(() => sessionStorage.setItem("logoPreview", logoPreview || ""), [logoPreview]);
+  // useEffect(() => sessionStorage.setItem("headerColor", headerColor), [headerColor]);
 
   useEffect(() => {
     getProductos()
       .then((res) => setProducts(res.data))
       .catch(() => setProducts([]));
   }, []);
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setLogoPreview(reader.result); // Data URL para previsualizar y guardar
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const headerTextColor = getContrastColor(headerColor);
+  const SelectedTemplate = selectedKey ? map[selectedKey]?.Component : null;
 
   return (
     <div className="w-full p-8">
@@ -287,35 +326,47 @@ const CustomizeStore = () => {
           </div>
         )}
       </header>
-      <p className="text-gray-700 mb-6">
+      <p className="text-gray-700 mb-1">
         Aquí podrás cambiar el nombre, logo, colores y otros detalles visuales
         de tu tienda online.
       </p>
-      {/* Selector de plantilla */}
-      <div className="mb-6 flex gap-4">
-        <button
-          className={`px-4 py-2 rounded ${
-            templateType === "grid" ? "bg-blue-600 text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setTemplateType("grid")}
-        >
-          Vista Grid
-        </button>
-        <button
-          className={`px-4 py-2 rounded ${
-            templateType === "list" ? "bg-blue-600 text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setTemplateType("list")}
-        >
-          Vista Lista
-        </button>
+
+      {/* Zona de plantillas (galería + vista previa) */}
+      <div style={styles.page}>
+        <aside style={styles.leftPane}>
+          <h3 className="text-gray-800 font-semibold">Elige una plantilla</h3>
+          <TemplateGallery
+            /* Pasamos la lista descubierta dinámicamente */
+            templates={list}
+            /* Intentamos soportar distintas convenciones de props */
+            selectedKey={selectedKey}
+            selected={selectedKey}
+            onSelect={(key) => setSelectedKey(key)}
+            onSelectTemplate={(key) => setSelectedKey(key)}
+          />
+        </aside>
+
+        <main style={styles.rightPane}>
+          <h3 className="text-gray-800 font-semibold">Vista previa</h3>
+          <div style={styles.preview}>
+            {SelectedTemplate ? (
+              <SelectedTemplate
+                key={selectedKey}
+                /* Props útiles que las plantillas pueden usar si lo desean */
+                storeName={storeName}
+                logo={logoPreview}
+                headerColor={headerColor}
+                products={products}
+              />
+            ) : (
+              <div style={styles.empty}>
+                Selecciona una plantilla en la galería para ver la vista previa.
+              </div>
+            )}
+          </div>
+        </main>
       </div>
-      {/* Renderizado de productos según plantilla */}
-      {templateType === "grid" ? (
-        <TemplateGrid products={products} />
-      ) : (
-        <TemplateList products={products} />
-      )}
+
       {/* Botón Guardar Cambios abajo a la derecha */}
       <div
         style={{
@@ -335,6 +386,42 @@ const CustomizeStore = () => {
       {/* ...existing code... */}
     </div>
   );
+};
+
+const styles = {
+  page: {
+    display: "grid",
+    gridTemplateColumns: "360px 1fr",
+    gap: 16,
+    padding: 16,
+    height: "100%",
+    boxSizing: "border-box",
+  },
+  leftPane: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    minWidth: 280,
+  },
+  rightPane: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    minWidth: 0,
+  },
+  h2: { margin: 0, fontSize: 16, fontWeight: 600 },
+  preview: {
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    background: "#fff",
+    minHeight: 400,
+    padding: 8,
+    overflow: "auto",
+  },
+  empty: {
+    padding: 12,
+    color: "#475569",
+  },
 };
 
 export default CustomizeStore;
