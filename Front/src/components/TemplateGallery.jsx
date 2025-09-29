@@ -21,8 +21,8 @@ export default function TemplateGallery({ selectedKey, onSelect }) {
   if (!templates.length) {
     return (
       <div style={styles.empty}>
-        No se encontraron plantillas. Agrega archivos StoreTemplate*.jsx en
-        src/components.
+        No se encontraron plantillas. Agrega archivos StoreTemplate*.jsx en su
+        directorio correspondiente.
       </div>
     );
   }
