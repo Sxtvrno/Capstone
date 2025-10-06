@@ -105,7 +105,7 @@ export default function StoreTemplateD({
               type="text"
               placeholder="Buscar..."
               className="w-44 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              onChange={() => {}}
+              onChange={(e) => setSearch(e.target.value)}
             />
             <select
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"

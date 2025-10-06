@@ -19,30 +19,40 @@ export default function TemplateGallery({ selectedKey, onSelect }) {
   }, []);
 
   if (!templates.length) {
-    return <div style={styles.empty}>No se encontraron plantillas.</div>;
+    return (
+      <div className="p-4 border-dashed border rounded-lg text-gray-700 bg-gray-100">
+        No se encontraron plantillas.
+      </div>
+    );
   }
 
   return (
-    <div style={styles.gallery}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full">
       {templates.map(({ key, name }) => {
         const isActive = key === selectedKey;
         return (
           <button
             key={key}
             onClick={() => onSelect?.(key)}
-            style={{
-              ...styles.card,
-              ...(isActive ? styles.cardActive : {}),
-            }}
+            className={`flex flex-col border rounded-lg p-4 text-left cursor-pointer transition-shadow duration-150 ease-in-out 
+              ${
+                isActive
+                  ? "border-blue-500 shadow-lg"
+                  : "border-gray-300 hover:shadow-md"
+              }`}
             aria-pressed={isActive}
             title={name}
           >
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>{name}</span>
-              {isActive && <span style={styles.badge}>Activa</span>}
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-semibold">{name}</span>
+              {isActive && (
+                <span className="text-xs bg-blue-100 text-blue-600 rounded-full px-2">
+                  Activa
+                </span>
+              )}
             </div>
-            <div style={styles.cardBody}>
-              <span style={styles.cardHint}>Click para seleccionar</span>
+            <div className="text-gray-600 text-sm">
+              <span className="opacity-90">Click para seleccionar</span>
             </div>
           </button>
         );
@@ -58,51 +68,3 @@ function humanizeName(key) {
     .replace(/Store Template/i, "Store Template")
     .trim();
 }
-
-const styles = {
-  gallery: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap: "12px",
-    width: "100%",
-  },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "stretch",
-    border: "1px solid #e2e8f0",
-    borderRadius: 8,
-    background: "#fff",
-    padding: 12,
-    textAlign: "left",
-    cursor: "pointer",
-    transition: "box-shadow 120ms ease, border-color 120ms ease",
-  },
-  cardActive: {
-    borderColor: "#3b82f6",
-    boxShadow: "0 0 0 3px rgba(59,130,246,0.2)",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  cardTitle: { fontWeight: 600 },
-  badge: {
-    fontSize: 12,
-    padding: "2px 6px",
-    background: "#e0f2fe",
-    color: "#0369a1",
-    borderRadius: 999,
-  },
-  cardBody: { color: "#64748b", fontSize: 12 },
-  cardHint: { opacity: 0.9 },
-  empty: {
-    padding: 12,
-    border: "1px dashed #cbd5e1",
-    borderRadius: 8,
-    color: "#475569",
-    background: "#f8fafc",
-  },
-};

@@ -14,6 +14,7 @@ import AuthForm from "./components/AuthForm";
 import MediaManager from "./components/MediaManager";
 import LandingPage from "./pages/LandingPage";
 import AdminPage from "./pages/AdminPage";
+import SearchPage from "./pages/SearchPage";
 
 const initialProducts = [
   { id: 1, name: "Producto 1" },
@@ -69,9 +70,9 @@ function AppRoutes({ isAuthenticated, onAuth, onLogout, products, onDelete }) {
 
   if (isAdminPath) {
     return (
-      <div className="flex min-h-screen items-stretch">
+      <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row">
         <Sidebar onLogout={onLogout} />
-        <main className="flex-1 ml-64 p-8 bg-gray-50 min-h-screen">
+        <main className="flex-1 p-4 md:p-8 bg-gray-50 min-h-screen transition-all duration-300 md:ml-64">
           <Routes>
             <Route
               path="/admin"
@@ -99,6 +100,7 @@ function AppRoutes({ isAuthenticated, onAuth, onLogout, products, onDelete }) {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/search" element={<SearchPage />} />
       <Route
         path="/login"
         element={

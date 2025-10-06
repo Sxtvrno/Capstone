@@ -13,13 +13,10 @@ const ProductList = () => {
   const [productoEdit, setProductoEdit] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // Referencia para el menú desplegable
   const menuRef = useRef(null);
 
-  // Efecto para detectar clics fuera del menú
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Si el menú está abierto y el clic fue fuera del menú, cerrarlo
       if (
         menuOpen &&
         menuRef.current &&
@@ -29,14 +26,11 @@ const ProductList = () => {
       }
     };
 
-    // Agregar el event listener cuando el componente se monta o menuOpen cambia
     document.addEventListener("mousedown", handleClickOutside);
-
-    // Cleanup: remover el event listener cuando el componente se desmonta
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [menuOpen]); // Se re-ejecuta cuando menuOpen cambia
+  }, [menuOpen]);
 
   useEffect(() => {
     getProductos()
@@ -53,28 +47,24 @@ const ProductList = () => {
       .catch((err) => setCategorias([]));
   }, []);
 
-  // Filtrar productos por nombre o título
   const productosFiltrados = productos.filter((p) =>
     (p.nombre || p.name || p.title || "")
       .toLowerCase()
       .includes(search.toLowerCase())
   );
 
-  // Función para obtener el nombre de la categoría
   const getCategoriaNombre = (id) => {
     const categoria = categorias.find((cat) => cat.id === Number(id));
     return categoria ? categoria.name : "—";
   };
 
-  // Función para actualizar la lista al crear un producto
   const handleProductoCreado = (nuevoProducto) => {
     setProductos([...productos, nuevoProducto]);
     setCreateModalOpen(false);
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6">
-      {/* Barra de búsqueda y botón + */}
+    <div className="flex flex-col w-full max-w-6xl mx-auto p-6">
       <div className="mb-6 flex items-center gap-2">
         <input
           type="text"
@@ -93,7 +83,6 @@ const ProductList = () => {
       </div>
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
-          {/* Header */}
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500 uppercase tracking-wider text-xs">
               <th className="px-4 py-3 font-medium">Product name</th>
@@ -102,11 +91,10 @@ const ProductList = () => {
               <th className="px-4 py-3 font-medium">Stock</th>
               <th className="px-4 py-3 font-medium">Description</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 text-right font-medium">Price</th>
+              <th className="w-8 px-4 py-3 text-right font-medium">Price</th>
               <th className="w-8 px-4 py-3"></th>
             </tr>
           </thead>
-          {/* Body */}
           <tbody className="divide-y divide-gray-200">
             {productosFiltrados.length > 0 ? (
               productosFiltrados.map((producto) => (
@@ -230,7 +218,6 @@ const ProductList = () => {
           </tbody>
         </table>
       </div>
-      {/* Modal de edición */}
       {editModalOpen && productoEdit && (
         <EditProductForm
           producto={productoEdit}
@@ -245,7 +232,6 @@ const ProductList = () => {
           }}
         />
       )}
-      {/* Modal de creación */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg relative">
@@ -263,7 +249,6 @@ const ProductList = () => {
           </div>
         </div>
       )}
-      {/* estilos locales para clamp (sin plugin) */}
       <style>{`
         .line-clamp-1 { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
       `}</style>

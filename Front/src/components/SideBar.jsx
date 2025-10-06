@@ -84,7 +84,7 @@ const Sidebar = ({ onLogout }) => {
               collapsed ? "w-full text-center" : ""
             }`}
           >
-            {collapsed ? "MN" : "Menú"}
+            {collapsed ? "M" : "Menú"}
           </div>
           {/* Botón colapsar (desktop) */}
           <button
@@ -216,6 +216,15 @@ const Sidebar = ({ onLogout }) => {
           </div>
         </div>
       </aside>
+
+      {/* Contenedor principal que se ajusta al tamaño de la barra lateral */}
+      <div
+        className={`transition-all duration-300 ${
+          collapsed ? "ml-16" : "ml-64"
+        } md:ml-0`}
+      >
+        {/* Aquí van los demás componentes que deben ajustarse */}
+      </div>
     </>
   );
 };

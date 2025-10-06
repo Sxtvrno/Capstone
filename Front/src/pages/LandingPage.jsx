@@ -23,10 +23,10 @@ const LandingPage = () => {
       localStorage.getItem("selectedTemplateKey") || templates[0]?.key || null
   );
 
-  // Datos visuales guardados en CustomizeStore (sessionStorage)
-  const storeName = sessionStorage.getItem("storeName") || "Mi Tienda";
-  const headerColor = sessionStorage.getItem("headerColor") || "#111827";
-  const logo = sessionStorage.getItem("logoPreview") || null;
+  // Datos visuales guardados en CustomizeStore (localStorage)
+  const storeName = localStorage.getItem("storeName") || "Mi Tienda";
+  const headerColor = localStorage.getItem("headerColor") || "#111827";
+  const logo = localStorage.getItem("logoPreview") || null;
 
   useEffect(() => {
     getProductos()
