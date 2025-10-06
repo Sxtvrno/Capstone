@@ -471,8 +471,7 @@ async def get_user_by_email(email: str, conn) -> Optional[dict]:
     """Obtiene un usuario por email"""
     try:
         query = """
-            SELECT id, email, first_name, last_name, phone, address, 
-                   verification_status, social_login_id
+            SELECT id, email, first_name, last_name, phone, address, verification_status, social_login_id
             FROM Usuario 
             WHERE email = $1
         """
