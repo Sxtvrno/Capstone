@@ -127,7 +127,7 @@ export default function StoreTemplateC(props) {
                     }}
                   >
                     {p.price != null && (
-                      <strong>${Number(p.price).toFixed(2)}</strong>
+                      <strong>${Number(p.price).toFixed(0)}</strong>
                     )}
                     <div style={{ display: "flex", gap: 8 }}>
                       <button

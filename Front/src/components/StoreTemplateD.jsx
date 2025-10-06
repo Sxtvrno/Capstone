@@ -112,7 +112,7 @@ export default function StoreTemplateA({
                   </div>
                   {p.price != null && (
                     <div style={{ color: "#6b7280", marginTop: 4 }}>
-                      ${Number(p.price).toFixed(2)}
+                      ${Number(p.price).toFixed(0)}
                     </div>
                   )}
                 </div>
