@@ -40,7 +40,9 @@ function getContrastColor(hex) {
 
 const CustomizeStore = () => {
   const { list, map } = useStoreTemplates();
-  const [selectedKey, setSelectedKey] = useState(() => list[0]?.key || null);
+  const [selectedKey, setSelectedKey] = useState(
+    () => localStorage.getItem("selectedTemplateKey") || list[0]?.key || null
+  );
   const [storeName, setStoreName] = useState(
     () => sessionStorage.getItem("storeName") || "Mi Tienda"
   );
@@ -341,8 +343,14 @@ const CustomizeStore = () => {
             /* Intentamos soportar distintas convenciones de props */
             selectedKey={selectedKey}
             selected={selectedKey}
-            onSelect={(key) => setSelectedKey(key)}
-            onSelectTemplate={(key) => setSelectedKey(key)}
+            onSelect={(key) => {
+              setSelectedKey(key);
+              if (key) localStorage.setItem("selectedTemplateKey", key);
+            }}
+            onSelectTemplate={(key) => {
+              setSelectedKey(key);
+              if (key) localStorage.setItem("selectedTemplateKey", key);
+            }}
           />
         </aside>
 

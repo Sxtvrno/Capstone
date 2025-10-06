@@ -11,6 +11,7 @@ function ProductForm({ onAuthError }) {
   const [toastMessage, setToastMessage] = useState(""); // Para mostrar el mensaje de éxito o error
   const [toastVisible, setToastVisible] = useState(false); // Para controlar si el toast está visible
   const [categorias, setCategorias] = useState([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/categorias-con-id/`, {
@@ -26,6 +27,7 @@ function ProductForm({ onAuthError }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       await addProducto(
         {
@@ -56,12 +58,19 @@ function ProductForm({ onAuthError }) {
         setToastVisible(true); // Mostrar el toast
         setTimeout(() => setToastVisible(false), 3000); // Desaparecer el toast después de 3 segundos
       }
+    } finally {
+      setSaving(false);
     }
   };
 
   const categoriaSeleccionada = categorias.find(
     (c) => c.id === Number(categoryId)
   );
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setValues((v) => ({ ...v, [name]: type === "checkbox" ? checked : value }));
+  };
 
   return (
     <div className="w-full max-w-xl mx-auto">
@@ -195,7 +204,7 @@ function ProductForm({ onAuthError }) {
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
           >
-            Agregar
+            {saving ? "Guardando..." : "Agregar"}
           </button>
         </div>
       </form>

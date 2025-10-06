@@ -128,7 +128,7 @@ export default function StoreTemplateD({
             const title = p.name || p.title || "Producto";
             const price =
               p.price != null && !Number.isNaN(Number(p.price))
-                ? Number(p.price).toFixed(2)
+                ? Number(p.price).toFixed(0)
                 : null;
 
             return (

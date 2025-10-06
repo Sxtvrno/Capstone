@@ -7,7 +7,9 @@ function EditProductForm({ producto, onClose, onUpdate }) {
   const [title, setTitle] = useState(producto.title || "");
   const [description, setDescription] = useState(producto.description || "");
   const [price, setPrice] = useState(producto.price || 0);
-  const [stockQuantity, setStockQuantity] = useState(producto.stock_quantity || 0);
+  const [stockQuantity, setStockQuantity] = useState(
+    producto.stock_quantity || 0
+  );
   const [categoryId, setCategoryId] = useState(producto.category_id || 0);
   const [toastMessage, setToastMessage] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
@@ -55,35 +57,115 @@ function EditProductForm({ producto, onClose, onUpdate }) {
           &times;
         </button>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Editar producto</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+            Editar producto
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="flex flex-col gap-2">
-              <label htmlFor="sku" className="text-sm font-medium text-gray-700">SKU</label>
-              <input id="sku" type="text" value={sku} onChange={e => setSku(e.target.value)} required className="w-full rounded-xl border border-gray-200 px-4 py-2.5" />
+              <label
+                htmlFor="sku"
+                className="text-sm font-medium text-gray-700"
+              >
+                SKU
+              </label>
+              <input
+                id="sku"
+                type="text"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                required
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+              />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="title" className="text-sm font-medium text-gray-700">Título</label>
-              <input id="title" type="text" value={title} onChange={e => setTitle(e.target.value)} required className="w-full rounded-xl border border-gray-200 px-4 py-2.5" />
+              <label
+                htmlFor="title"
+                className="text-sm font-medium text-gray-700"
+              >
+                Título
+              </label>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+              />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="price" className="text-sm font-medium text-gray-700">Precio</label>
-              <input id="price" type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2.5" />
+              <label
+                htmlFor="price"
+                className="text-sm font-medium text-gray-700"
+              >
+                Precio
+              </label>
+              <input
+                id="price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+              />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="stockQuantity" className="text-sm font-medium text-gray-700">Stock</label>
-              <input id="stockQuantity" type="number" min="0" value={stockQuantity} onChange={e => setStockQuantity(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2.5" />
+              <label
+                htmlFor="stockQuantity"
+                className="text-sm font-medium text-gray-700"
+              >
+                Stock
+              </label>
+              <input
+                id="stockQuantity"
+                type="number"
+                min="0"
+                value={stockQuantity}
+                onChange={(e) => setStockQuantity(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+              />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="categoryId" className="text-sm font-medium text-gray-700">Categoría (ID)</label>
-              <input id="categoryId" type="number" min="1" value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2.5" />
+              <label
+                htmlFor="categoryId"
+                className="text-sm font-medium text-gray-700"
+              >
+                Categoría (ID)
+              </label>
+              <input
+                id="categoryId"
+                type="number"
+                min="1"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+              />
             </div>
           </div>
           <div className="md:col-span-2 flex flex-col gap-2">
-            <label htmlFor="description" className="text-sm font-medium text-gray-700">Descripción</label>
-            <textarea id="description" value={description} onChange={e => setDescription(e.target.value)} required rows={4} className="w-full rounded-xl border border-gray-200 px-4 py-3" />
+            <label
+              htmlFor="description"
+              className="text-sm font-medium text-gray-700"
+            >
+              Descripción
+            </label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+              rows={4}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3"
+            />
           </div>
           <div className="pt-2">
-            <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-sm hover:bg-blue-700">Guardar cambios</button>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-sm hover:bg-blue-700"
+            >
+              Guardar cambios
+            </button>
           </div>
         </form>
         {toastVisible && (

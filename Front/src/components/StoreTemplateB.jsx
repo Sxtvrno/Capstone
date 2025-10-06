@@ -127,7 +127,7 @@ export default function StoreTemplateB({
                     <strong>{p.name || p.title || "Producto"}</strong>
                     {p.price != null && (
                       <span style={{ color: "#16a34a" }}>
-                        ${Number(p.price).toFixed(2)}
+                        ${Number(p.price).toFixed(0)}
                       </span>
                     )}
                   </div>
