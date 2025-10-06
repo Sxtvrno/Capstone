@@ -49,19 +49,19 @@ function EditProductForm({ producto, onClose, onUpdate }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 md:p-8 w-full max-w-3xl relative">
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-4 md:p-6 w-full max-w-sm relative">
         <button
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
           onClick={onClose}
         >
           &times;
         </button>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900">
             Editar producto
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex flex-col gap-1">
               <label
                 htmlFor="sku"
                 className="text-sm font-medium text-gray-700"
@@ -74,10 +74,10 @@ function EditProductForm({ producto, onClose, onUpdate }) {
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2"
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               <label
                 htmlFor="title"
                 className="text-sm font-medium text-gray-700"
@@ -90,10 +90,10 @@ function EditProductForm({ producto, onClose, onUpdate }) {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2"
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               <label
                 htmlFor="price"
                 className="text-sm font-medium text-gray-700"
@@ -107,10 +107,10 @@ function EditProductForm({ producto, onClose, onUpdate }) {
                 step="0.01"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2"
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               <label
                 htmlFor="stockQuantity"
                 className="text-sm font-medium text-gray-700"
@@ -123,10 +123,10 @@ function EditProductForm({ producto, onClose, onUpdate }) {
                 min="0"
                 value={stockQuantity}
                 onChange={(e) => setStockQuantity(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2"
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               <label
                 htmlFor="categoryId"
                 className="text-sm font-medium text-gray-700"
@@ -139,11 +139,11 @@ function EditProductForm({ producto, onClose, onUpdate }) {
                 min="1"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2"
               />
             </div>
           </div>
-          <div className="md:col-span-2 flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             <label
               htmlFor="description"
               className="text-sm font-medium text-gray-700"
@@ -155,14 +155,14 @@ function EditProductForm({ producto, onClose, onUpdate }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
-              rows={4}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3"
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2"
             />
           </div>
           <div className="pt-2">
             <button
               type="submit"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white shadow-sm hover:bg-blue-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm hover:bg-blue-700"
             >
               Guardar cambios
             </button>

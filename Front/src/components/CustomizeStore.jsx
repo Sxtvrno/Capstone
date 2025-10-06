@@ -44,7 +44,7 @@ const CustomizeStore = () => {
     () => localStorage.getItem("selectedTemplateKey") || list[0]?.key || null
   );
   const [storeName, setStoreName] = useState(
-    () => sessionStorage.getItem("storeName") || "Mi Tienda"
+    () => localStorage.getItem("storeName") || "Mi Tienda"
   );
   const [editingName, setEditingName] = useState(false);
   const [products, setProducts] = useState([]);
@@ -53,17 +53,17 @@ const CustomizeStore = () => {
 
   // NUEVO: estado para el logo
   const [logoPreview, setLogoPreview] = useState(
-    () => sessionStorage.getItem("logoPreview") || null
+    () => localStorage.getItem("logoPreview") || null
   );
 
   // NUEVO: headerColor como estado (antes era const)
   const [headerColor, setHeaderColor] = useState(
-    () => sessionStorage.getItem("headerColor") || "#ffffff"
+    () => localStorage.getItem("headerColor") || "#ffffff"
   );
 
-  // Guardar el nombre en sessionStorage cuando cambie
+  // Guardar el nombre en localStorage cuando cambie
   React.useEffect(() => {
-    sessionStorage.setItem("storeName", storeName);
+    localStorage.setItem("storeName", storeName);
   }, [storeName]);
 
   // SVG como logo predeterminado
@@ -84,25 +84,21 @@ const CustomizeStore = () => {
     </svg>
   );
 
-  // Nueva función para guardar cambios en sessionStorage
+  // Nueva función para guardar cambios en localStorage
   const handleSave = () => {
-    sessionStorage.setItem("storeName", storeName);
-    sessionStorage.setItem("logoPreview", logoPreview || "");
-    sessionStorage.setItem("headerColor", headerColor);
+    localStorage.setItem("storeName", storeName);
+    localStorage.setItem("logoPreview", logoPreview || "");
+    localStorage.setItem("headerColor", headerColor);
     alert("¡Cambios guardados correctamente!");
   };
 
   // Recuperar color y logo al cargar
   useEffect(() => {
-    const savedColor = sessionStorage.getItem("headerColor");
+    const savedColor = localStorage.getItem("headerColor");
     if (savedColor) setHeaderColor(savedColor);
-    const savedLogo = sessionStorage.getItem("logoPreview");
+    const savedLogo = localStorage.getItem("logoPreview");
     if (savedLogo) setLogoPreview(savedLogo);
   }, []);
-
-  // Si quieres persistir automáticamente cuando cambie el logo/color:
-  // useEffect(() => sessionStorage.setItem("logoPreview", logoPreview || ""), [logoPreview]);
-  // useEffect(() => sessionStorage.setItem("headerColor", headerColor), [headerColor]);
 
   useEffect(() => {
     getProductos()
@@ -147,7 +143,7 @@ const CustomizeStore = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 setLogoPreview(null);
-                sessionStorage.removeItem("logoPreview");
+                localStorage.removeItem("logoPreview");
               }}
               title="Quitar logo"
             >
@@ -334,40 +330,32 @@ const CustomizeStore = () => {
       </p>
 
       {/* Zona de plantillas (galería + vista previa) */}
-      <div style={styles.page}>
-        <aside style={styles.leftPane}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <aside className="flex flex-col gap-4">
           <h3 className="text-gray-800 font-semibold">Elige una plantilla</h3>
           <TemplateGallery
-            /* Pasamos la lista descubierta dinámicamente */
             templates={list}
-            /* Intentamos soportar distintas convenciones de props */
             selectedKey={selectedKey}
-            selected={selectedKey}
             onSelect={(key) => {
-              setSelectedKey(key);
-              if (key) localStorage.setItem("selectedTemplateKey", key);
-            }}
-            onSelectTemplate={(key) => {
               setSelectedKey(key);
               if (key) localStorage.setItem("selectedTemplateKey", key);
             }}
           />
         </aside>
 
-        <main style={styles.rightPane}>
+        <main className="flex flex-col gap-4">
           <h3 className="text-gray-800 font-semibold">Vista previa</h3>
-          <div style={styles.preview}>
+          <div className="border border-gray-300 rounded-lg p-4 min-h-[400px]">
             {SelectedTemplate ? (
               <SelectedTemplate
                 key={selectedKey}
-                /* Props útiles que las plantillas pueden usar si lo desean */
                 storeName={storeName}
                 logo={logoPreview}
                 headerColor={headerColor}
                 products={products}
               />
             ) : (
-              <div style={styles.empty}>
+              <div className="p-4 text-gray-500">
                 Selecciona una plantilla en la galería para ver la vista previa.
               </div>
             )}
@@ -376,14 +364,7 @@ const CustomizeStore = () => {
       </div>
 
       {/* Botón Guardar Cambios abajo a la derecha */}
-      <div
-        style={{
-          position: "fixed",
-          right: "2rem",
-          bottom: "2rem",
-          zIndex: 100,
-        }}
-      >
+      <div className="fixed right-4 bottom-4 z-100">
         <button
           className="px-6 py-3 rounded bg-green-600 text-white font-semibold shadow-lg hover:bg-green-700 transition"
           onClick={handleSave}
@@ -391,45 +372,8 @@ const CustomizeStore = () => {
           Guardar Cambios
         </button>
       </div>
-      {/* ...existing code... */}
     </div>
   );
-};
-
-const styles = {
-  page: {
-    display: "grid",
-    gridTemplateColumns: "360px 1fr",
-    gap: 16,
-    padding: 16,
-    height: "100%",
-    boxSizing: "border-box",
-  },
-  leftPane: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-    minWidth: 280,
-  },
-  rightPane: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-    minWidth: 0,
-  },
-  h2: { margin: 0, fontSize: 16, fontWeight: 600 },
-  preview: {
-    border: "1px solid #e2e8f0",
-    borderRadius: 8,
-    background: "#fff",
-    minHeight: 400,
-    padding: 8,
-    overflow: "auto",
-  },
-  empty: {
-    padding: 12,
-    color: "#475569",
-  },
 };
 
 export default CustomizeStore;

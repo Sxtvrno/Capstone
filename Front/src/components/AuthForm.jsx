@@ -7,6 +7,7 @@ const allowedDomains = [
   "hotmail.com",
   "yahoo.com",
   "live.com",
+  "duocuc.cl",
 ];
 
 const emailDomainValid = (email) => {

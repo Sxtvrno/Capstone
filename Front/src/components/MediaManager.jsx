@@ -58,12 +58,10 @@ const MediaManager = ({ onUpload }) => {
     setUploading(false);
   };
 
-  // Nueva función para borrar imagen
   const handleDeleteImagen = async (imgId, productoId) => {
     if (!window.confirm("¿Seguro que deseas borrar esta imagen?")) return;
     try {
       await deleteImagenProducto(imgId, localStorage.getItem("token"));
-      // Actualiza la lista de imágenes
       const imgs = await obtenerImagenesProducto(
         productoId,
         localStorage.getItem("token")
@@ -75,22 +73,22 @@ const MediaManager = ({ onUpload }) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
+    <div className="flex flex-col md:flex-row gap-6 p-4 bg-white rounded-lg shadow-md">
       {/* Panel compacto de productos y subida */}
       <div className="w-full md:w-1/2">
-        <h2 className="text-lg font-bold mb-2">Productos</h2>
-        <ul className="space-y-2">
+        <h2 className="text-lg font-bold mb-4 text-gray-800">Productos</h2>
+        <ul className="space-y-4">
           {productos.map((producto) => (
             <li
               key={producto.id}
-              className={`flex items-center gap-2 p-2 rounded border hover:bg-gray-50 cursor-pointer ${
+              className={`flex items-center gap-2 p-3 rounded-lg border hover:bg-gray-100 cursor-pointer transition duration-200 ${
                 selectedProducto === producto.id
-                  ? "bg-blue-50 border-blue-400"
-                  : ""
+                  ? "bg-blue-100 border-blue-400"
+                  : "border-gray-300"
               }`}
               onClick={() => setSelectedProducto(producto.id)}
             >
-              <span className="font-medium flex-1 truncate">
+              <span className="font-medium flex-1 truncate text-gray-700">
                 {producto.nombre || producto.name || producto.title}
               </span>
               <input
@@ -98,7 +96,7 @@ const MediaManager = ({ onUpload }) => {
                 placeholder="URL imagen"
                 value={urlInput[producto.id] || ""}
                 onChange={(e) => handleUrlChange(producto.id, e.target.value)}
-                className="border px-2 py-1 rounded text-sm w-32"
+                className="border border-gray-300 px-2 py-1 rounded text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 onClick={(e) => {
@@ -109,7 +107,7 @@ const MediaManager = ({ onUpload }) => {
                   uploading ||
                   !(urlInput[producto.id] && urlInput[producto.id].length > 0)
                 }
-                className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 transition duration-200"
               >
                 Subir
               </button>
@@ -119,7 +117,9 @@ const MediaManager = ({ onUpload }) => {
       </div>
       {/* Panel visualización de imágenes */}
       <div className="w-full md:w-1/2">
-        <h2 className="text-lg font-bold mb-2">Imágenes del producto</h2>
+        <h2 className="text-lg font-bold mb-4 text-gray-800">
+          Imágenes del producto
+        </h2>
         {selectedProducto ? (
           <div className="flex flex-wrap gap-2 border rounded p-2 min-h-[100px] bg-gray-50">
             {(imagenes[selectedProducto] || []).length === 0 ? (
@@ -128,14 +128,22 @@ const MediaManager = ({ onUpload }) => {
               </span>
             ) : (
               imagenes[selectedProducto].map((img) => (
-                <img
-                  key={img.id}
-                  src={img.url_imagen}
-                  alt="Producto"
-                  className="w-24 h-24 object-cover border rounded shadow cursor-pointer hover:opacity-70"
-                  title="Click para borrar"
-                  onClick={() => handleDeleteImagen(img.id, selectedProducto)}
-                />
+                <div key={img.id} className="relative">
+                  <img
+                    src={img.url_imagen}
+                    alt="Producto"
+                    className="w-24 h-24 object-cover border rounded shadow cursor-pointer hover:opacity-70 transition duration-200"
+                    title="Click para borrar"
+                    onClick={() => handleDeleteImagen(img.id, selectedProducto)}
+                  />
+                  <button
+                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
+                    onClick={() => handleDeleteImagen(img.id, selectedProducto)}
+                    title="Borrar imagen"
+                  >
+                    &times;
+                  </button>
+                </div>
               ))
             )}
           </div>
