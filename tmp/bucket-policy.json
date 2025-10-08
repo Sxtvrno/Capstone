@@ -1,0 +1,1 @@
+{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject"],"Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::993490992920:distribution/E1LYZEVTVJUV64"}},"Principal":{"Service":"cloudfront.amazonaws.com"},"Resource":["arn:aws:s3:::capstone-front-tahir-20251007211205/*"],"Effect":"Allow","Sid":"AllowCloudFrontServicePrincipalReadOnly"}]}
