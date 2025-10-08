@@ -1,0 +1,39 @@
+2025-10-07 23:22:31,622 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:22:31,627 [INFO] Running configSets: _OnInstanceBoot
+2025-10-07 23:22:31,630 [INFO] Running configSet _OnInstanceBoot
+2025-10-07 23:22:31,632 [INFO] Running config AWSEBBaseConfig
+2025-10-07 23:22:31,880 [INFO] Command clearbackupfiles succeeded
+2025-10-07 23:22:31,883 [INFO] Running config AWSEBCfnHupEndpointOverride
+2025-10-07 23:22:31,887 [INFO] Command clearbackupfiles succeeded
+2025-10-07 23:22:31,888 [INFO] ConfigSets completed
+2025-10-07 23:22:31,889 [INFO] -----------------------Build complete-----------------------
+2025-10-07 23:23:38,201 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:23:38,205 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-07 23:23:38,208 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-07 23:23:38,211 [INFO] Running config prebuild_0_Back
+2025-10-07 23:23:53,367 [ERROR] postgresql-devel is not available to be installed
+2025-10-07 23:23:53,368 [ERROR] Error encountered during build of prebuild_0_Back: Yum does not have postgresql-devel available for installation
+Traceback (most recent call last):
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 579, in run_config
+    CloudFormationCarpenter(config, self._auth_config, self.strict_mode).build(worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 244, in build
+    changes['packages'][manager] = CloudFormationCarpenter._packageTools[manager]().apply(packages,
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/rpm_tools.py", line 80, in apply
+    raise ToolError("Yum does not have %s available for installation" % pkg_spec)
+cfnbootstrap.construction_errors.ToolError: Yum does not have postgresql-devel available for installation
+2025-10-07 23:23:53,370 [ERROR] -----------------------BUILD FAILED!------------------------
+2025-10-07 23:23:53,370 [ERROR] Unhandled exception during build: Yum does not have postgresql-devel available for installation
+Traceback (most recent call last):
+  File "/opt/aws/bin/cfn-init", line 181, in <module>
+    worklog.build(metadata, configSets, strict_mode)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 137, in build
+    Contractor(metadata, strict_mode).build(configSets, self)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 567, in build
+    self.run_config(config, worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 579, in run_config
+    CloudFormationCarpenter(config, self._auth_config, self.strict_mode).build(worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 244, in build
+    changes['packages'][manager] = CloudFormationCarpenter._packageTools[manager]().apply(packages,
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/rpm_tools.py", line 80, in apply
+    raise ToolError("Yum does not have %s available for installation" % pkg_spec)
+cfnbootstrap.construction_errors.ToolError: Yum does not have postgresql-devel available for installation

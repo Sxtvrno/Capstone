@@ -1,0 +1,18 @@
+2025/10/07 23:31:14.902763 [INFO] Cleaning log publish record...
+2025/10/07 23:31:14.902815 [INFO] Start log publish job.
+2025/10/07 23:31:14.902820 [INFO] Start publish file /tmp/BundleLogs-1759879874885.zip
+2025/10/07 23:31:14.989417 [INFO] Successful upload file /tmp/BundleLogs-1759879874885.zip to s3 resources/environments/logs/bundle/e-f2kw6caqqy/i-048d789b7d32bff57/BundleLogs-1759879874885.zip
+2025/10/07 23:31:14.989555 [INFO] Finished log publish job.
+2025/10/07 23:31:29.202149 [INFO] Cleaning log publish record...
+2025/10/07 23:31:29.202180 [INFO] /tmp/BundleLogs-1759879874885.zip exists, no need for clean up
+2025/10/07 23:31:29.202183 [INFO] Start log publish job.
+2025/10/07 23:31:29.202186 [INFO] Start publish file /tmp/TailLogs-1759879889198.txt
+2025/10/07 23:31:29.255682 [INFO] Successful upload file /tmp/TailLogs-1759879889198.txt to s3 resources/environments/logs/tail/e-f2kw6caqqy/i-048d789b7d32bff57/TailLogs-1759879889198.txt
+2025/10/07 23:31:29.255812 [INFO] Finished log publish job.
+2025/10/07 23:41:33.258644 [INFO] Cleaning log publish record...
+2025/10/07 23:41:33.258699 [INFO] /tmp/BundleLogs-1759879874885.zip exists, no need for clean up
+2025/10/07 23:41:33.258706 [INFO] /tmp/TailLogs-1759879889198.txt exists, no need for clean up
+2025/10/07 23:41:33.258709 [INFO] Start log publish job.
+2025/10/07 23:41:33.258711 [INFO] Start publish file /tmp/BundleLogs-1759880493232.zip
+2025/10/07 23:41:33.319866 [INFO] Successful upload file /tmp/BundleLogs-1759880493232.zip to s3 resources/environments/logs/bundle/e-f2kw6caqqy/i-048d789b7d32bff57/BundleLogs-1759880493232.zip
+2025/10/07 23:41:33.320013 [INFO] Finished log publish job.

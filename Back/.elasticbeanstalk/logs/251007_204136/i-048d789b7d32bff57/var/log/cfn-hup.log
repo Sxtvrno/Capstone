@@ -1,0 +1,26 @@
+2025-10-07 23:22:35,279 [DEBUG] CloudFormation client initialized with endpoint https://cloudformation.us-east-1.amazonaws.com
+2025-10-07 23:22:35,279 [DEBUG] SQS client initialized with endpoint https://sqs.us-east-1.amazonaws.com
+2025-10-07 23:22:35,280 [DEBUG] CloudFormation client initialized with endpoint https://cloudformation.us-east-1.amazonaws.com
+2025-10-07 23:22:35,280 [DEBUG] Enabled single threading mode.
+2025-10-07 23:22:35,280 [DEBUG] Creating /var/lib/cfn-hup/data
+2025-10-07 23:22:35,313 [INFO] No umask value specified in config file. Using the default one: 0o22
+2025-10-07 23:22:35,369 [INFO] Pid: 1786
+2025-10-07 23:22:35,788 [INFO] Refreshing listener credentials
+2025-10-07 23:22:35,875 [INFO] Scheduling next credential refresh in 1800.0 seconds
+2025-10-07 23:23:35,877 [WARNING] Timeout of 60 seconds breached
+2025-10-07 23:23:35,877 [ERROR] Client-side timeout
+Traceback (most recent call last):
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/util.py", line 191, in _retry
+    return f(*args, **kwargs)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/util.py", line 264, in _timeout
+    raise TimeoutError(
+cfnbootstrap.util.TimeoutError
+2025-10-07 23:23:36,852 [INFO] Received command ElasticBeanstalkCommand-AWSEBAutoScalingGroup (invocation id: f4a521a6-3e1b-493d-bfda-db2dc646e3a8)
+2025-10-07 23:23:36,853 [INFO] Running action for aws-eb-command-handler
+2025-10-07 23:23:53,402 [INFO] Action for aws-eb-command-handler succeeded, returning SUCCESS
+2025-10-07 23:27:53,797 [INFO] command processing is alive.
+2025-10-07 23:29:14,456 [INFO] Received command ElasticBeanstalkCommand-AWSEBAutoScalingGroup (invocation id: 8c35487f-6892-4c57-b1c6-efe88e582ecd)
+2025-10-07 23:29:14,456 [INFO] Running action for aws-eb-command-handler
+2025-10-07 23:29:18,901 [INFO] Action for aws-eb-command-handler succeeded, returning SUCCESS
+2025-10-07 23:31:14,184 [INFO] Received command ElasticBeanstalkCommand-AWSEBAutoScalingGroup (invocation id: 1a6b7826-ca4d-4753-a9b9-1ab3840ed576)
+2025-10-07 23:31:14,184 [INFO] Running action for aws-eb-command-handler
