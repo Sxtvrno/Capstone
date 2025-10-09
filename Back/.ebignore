@@ -1,18 +1,21 @@
 # Git/IDE
+
 .git/
 .gitignore
 .vscode/
 .idea/
 
 # Logs
-*.log
+
+\*.log
 .elasticbeanstalk/logs/
 
 # Python caches and virtual envs
-**/__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
+
+\*_/**pycache**/
+_.py[cod]
+_.pyo
+_.pyd
 .venv/
 venv/
 env/
@@ -21,9 +24,11 @@ env/
 .ruff_cache/
 
 # Environment files and build artifacts
-.env*
+
+.env\*
 media/
 staticfiles/
 
 # Elastic Beanstalk app versions
+
 .elasticbeanstalk/app_versions/
