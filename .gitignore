@@ -1,0 +1,41 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env files (keep only *.example tracked)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Front (Vite/Node)
+Front/node_modules/
+Front/dist/
+Front/.eslintcache
+Front/npm-debug.log*
+Front/yarn-*.log
+Front/pnpm-debug.log
+
+# Back (Python/Django)
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+db.sqlite3
+media/
+staticfiles/
+
+# Elastic Beanstalk artifacts and logs
+Back/.elasticbeanstalk/app_versions/
+Back/.elasticbeanstalk/logs/
