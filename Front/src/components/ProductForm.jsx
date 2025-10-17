@@ -5,13 +5,12 @@ function ProductForm({ onAuthError }) {
   const [sku, setSku] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState(0);
-  const [stockQuantity, setStockQuantity] = useState(0);
-  const [categoryId, setCategoryId] = useState(0);
-  const [toastMessage, setToastMessage] = useState(""); // Para mostrar el mensaje de éxito o error
-  const [toastVisible, setToastVisible] = useState(false); // Para controlar si el toast está visible
+  const [price, setPrice] = useState("");
+  const [stockQuantity, setStockQuantity] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
   const [categorias, setCategorias] = useState([]);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/categorias-con-id/`, {
@@ -27,7 +26,9 @@ function ProductForm({ onAuthError }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
     try {
       await addProducto(
         {
@@ -40,45 +41,45 @@ function ProductForm({ onAuthError }) {
         },
         onAuthError
       );
-      setToastMessage("Producto agregado exitosamente!");
-      setToastVisible(true); // Mostrar el toast
-      setTimeout(() => setToastVisible(false), 3000); // Desaparecer el toast después de 3 segundos
-      // Limpiar campos
+      setMessage({ type: "success", text: "Producto creado exitosamente" });
+      // Limpiar formulario
       setSku("");
       setTitle("");
       setDescription("");
-      setPrice(0);
-      setStockQuantity(0);
-      setCategoryId(0);
+      setPrice("");
+      setStockQuantity("");
+      setCategoryId("");
     } catch (error) {
-      if (error?.response?.status === 401 && onAuthError) {
-        onAuthError(error);
-      } else {
-        setToastMessage("Hubo un error al agregar el producto");
-        setToastVisible(true); // Mostrar el toast
-        setTimeout(() => setToastVisible(false), 3000); // Desaparecer el toast después de 3 segundos
-      }
+      setMessage({
+        type: "error",
+        text: "Error al crear el producto. Intenta nuevamente.",
+      });
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const categoriaSeleccionada = categorias.find(
-    (c) => c.id === Number(categoryId)
-  );
-
   return (
-    <div className="flex flex-col w-full max-w-4xl mx-auto p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white/90 backdrop-blur rounded-xl shadow-lg border border-gray-100 p-4 space-y-4"
-      >
-        <h2 className="text-xl font-bold text-gray-900 mb-1">
-          Agregar producto
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="sku" className="text-xs font-medium text-gray-700">
+    <div className="p-4 md:p-6 lg:p-8">
+      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6">
+        {/* Alert Messages */}
+        {message.text && (
+          <div
+            className={`p-4 rounded-lg ${
+              message.type === "success"
+                ? "bg-green-50 text-green-800 border border-green-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+
+        {/* Grid para campos - Responsive */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {/* SKU */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="sku" className="text-sm font-medium text-gray-700">
               SKU <span className="text-red-500">*</span>
             </label>
             <input
@@ -86,15 +87,17 @@ function ProductForm({ onAuthError }) {
               type="text"
               value={sku}
               onChange={(e) => setSku(e.target.value)}
-              placeholder="EJ: ABC-123"
               required
-              className="rounded-lg border border-gray-200 px-3 py-2 text-gray-900 text-sm"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Ej: PROD-001"
             />
           </div>
-          <div className="flex flex-col gap-1">
+
+          {/* Título */}
+          <div className="flex flex-col gap-2">
             <label
               htmlFor="title"
-              className="text-xs font-medium text-gray-700"
+              className="text-sm font-medium text-gray-700"
             >
               Título <span className="text-red-500">*</span>
             </label>
@@ -103,17 +106,19 @@ function ProductForm({ onAuthError }) {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Nombre del producto"
               required
-              className="rounded-lg border border-gray-200 px-3 py-2 text-gray-900 text-sm"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Nombre del producto"
             />
           </div>
-          <div className="flex flex-col gap-1">
+
+          {/* Precio */}
+          <div className="flex flex-col gap-2">
             <label
               htmlFor="price"
-              className="text-xs font-medium text-gray-700"
+              className="text-sm font-medium text-gray-700"
             >
-              Precio
+              Precio <span className="text-red-500">*</span>
             </label>
             <input
               id="price"
@@ -122,16 +127,19 @@ function ProductForm({ onAuthError }) {
               step="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              required
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
-              className="rounded-lg border border-gray-200 px-3 py-2 text-gray-900 text-sm"
             />
           </div>
-          <div className="flex flex-col gap-1">
+
+          {/* Stock */}
+          <div className="flex flex-col gap-2">
             <label
               htmlFor="stockQuantity"
-              className="text-xs font-medium text-gray-700"
+              className="text-sm font-medium text-gray-700"
             >
-              Stock
+              Stock <span className="text-red-500">*</span>
             </label>
             <input
               id="stockQuantity"
@@ -139,48 +147,38 @@ function ProductForm({ onAuthError }) {
               min="0"
               value={stockQuantity}
               onChange={(e) => setStockQuantity(e.target.value)}
+              required
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0"
-              className="rounded-lg border border-gray-200 px-3 py-2 text-gray-900 text-sm"
             />
           </div>
-          <div className="flex flex-col gap-1 md:col-span-2">
+
+          {/* Categoría ID */}
+          <div className="flex flex-col gap-2 md:col-span-2">
             <label
               htmlFor="categoryId"
-              className="text-xs font-medium text-gray-700"
+              className="text-sm font-medium text-gray-700"
             >
-              Categoría <span className="text-red-500">*</span>
+              Categoría (ID) <span className="text-red-500">*</span>
             </label>
-            <select
+            <input
               id="categoryId"
+              type="number"
+              min="1"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               required
-              className="rounded-lg border border-gray-200 px-3 py-2 text-gray-900 text-sm"
-            >
-              <option value={0} disabled>
-                Selecciona una categoría
-              </option>
-              {categorias.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.id} - {cat.name}
-                </option>
-              ))}
-            </select>
-            {categoriaSeleccionada && (
-              <div className="text-xs text-gray-500 mt-1">
-                <span className="font-semibold">ID:</span>{" "}
-                {categoriaSeleccionada.id}
-                &nbsp;
-                <span className="font-semibold">Nombre:</span>{" "}
-                {categoriaSeleccionada.name}
-              </div>
-            )}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="1"
+            />
           </div>
         </div>
-        <div className="flex flex-col gap-1">
+
+        {/* Descripción - Full width */}
+        <div className="flex flex-col gap-2">
           <label
             htmlFor="description"
-            className="text-xs font-medium text-gray-700"
+            className="text-sm font-medium text-gray-700"
           >
             Descripción <span className="text-red-500">*</span>
           </label>
@@ -188,46 +186,24 @@ function ProductForm({ onAuthError }) {
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe características, materiales, medidas, etc."
             required
-            rows={3}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-gray-900 text-sm resize-y"
+            rows={4}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            placeholder="Describe tu producto..."
           />
         </div>
-        <div className="pt-2">
+
+        {/* Botón Submit */}
+        <div className="pt-4">
           <button
             type="submit"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
+            disabled={loading}
+            className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Guardando..." : "Agregar"}
+            {loading ? "Creando..." : "Crear Producto"}
           </button>
         </div>
       </form>
-      {toastVisible && (
-        <div className="fixed bottom-5 right-5 z-50">
-          <div className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-xl bg-green-600 text-white shadow-2xl ring-1 ring-black/5 animate-[slideIn_.3s_ease-out]">
-            <div className="p-4">
-              <p className="text-sm font-medium">{toastMessage}</p>
-            </div>
-            <div className="h-1 w-full bg-green-700/60">
-              <div className="h-full w-full origin-left animate-[growBar_2500ms_linear_forwards] bg-white/70"></div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* estilos locales al componente */}
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateY(8px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes growBar {
-          from { transform: scaleX(1); }
-          to { transform: scaleX(0); }
-        }
-        .animate-\\[slideIn_.3s_ease-out\\] { animation: slideIn .3s ease-out; }
-        .animate-\\[growBar_2500ms_linear_forwards\\] { animation: growBar 2500ms linear forwards; }
-      `}</style>
     </div>
   );
 }
