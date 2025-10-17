@@ -169,3 +169,49 @@ export const deleteImagenProducto = async (imagenId, token) => {
   if (!response.ok) throw new Error("Error al borrar la imagen");
   return await response.json();
 };
+
+export const getCategorias = async (onAuthError) => {
+  const token = localStorage.getItem("token");
+  try {
+    return await axios.get(`${API_URL}/api/categorias-con-id/`, {
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    if (error?.response?.status === 401 && onAuthError) {
+      onAuthError(error);
+    }
+    throw error;
+  }
+};
+
+export const getProductosPorCategorias = async (
+  categoriaIds = null,
+  skip = 0,
+  limit = 100,
+  onAuthError
+) => {
+  const token = localStorage.getItem("token");
+  try {
+    const params = { skip, limit };
+    if (categoriaIds) {
+      params.categoria_ids = Array.isArray(categoriaIds)
+        ? categoriaIds.join(",")
+        : categoriaIds;
+    }
+    return await axios.get(`${API_URL}/api/productos/por-categorias`, {
+      params,
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    if (error?.response?.status === 401 && onAuthError) {
+      onAuthError(error);
+    }
+    throw error;
+  }
+};

@@ -1256,6 +1256,86 @@ async def obtener_productos_publicos(
         raise HTTPException(status_code=500, detail="Error al obtener productos")
 
 
+@app.get("/api/productos/por-categorias", response_model=List[ProductoResponse])
+async def obtener_productos_por_categorias(
+    categoria_ids: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    conn=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Obtener productos filtrados por una lista de categorías (ids separados por coma).
+    Si no se proporcionan categoría_ids, devuelve todos los productos (con paginación)."""
+    try:
+        if categoria_ids:
+            ids = [int(x) for x in categoria_ids.split(",") if x.strip().isdigit()]
+            if not ids:
+                return []
+            query = """
+                SELECT id, sku, title, description, price, stock_quantity, category_id, status
+                FROM producto
+                WHERE category_id = ANY($3::int[])
+                ORDER BY id
+                LIMIT $1 OFFSET $2
+            """
+            results = await conn.fetch(query, limit, skip, ids)
+        else:
+            query = """
+                SELECT id, sku, title, description, price, stock_quantity, category_id, status
+                FROM producto
+                ORDER BY id
+                LIMIT $1 OFFSET $2
+            """
+            results = await conn.fetch(query, limit, skip)
+
+        return [dict(row) for row in results]
+    except Exception as e:
+        logger.error(f"Error obteniendo productos por categorías: {e}")
+        raise HTTPException(
+            status_code=500, detail="Error al obtener productos por categorías"
+        )
+
+
+# Public counterpart (sin autenticación)
+@app.get("/api/public/productos/por-categorias", response_model=List[ProductoResponse])
+async def obtener_productos_publicos_por_categorias(
+    categoria_ids: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    conn=Depends(get_db),
+):
+    """Obtener productos públicos filtrados por categorías (sin autenticación)."""
+    try:
+        if categoria_ids:
+            ids = [int(x) for x in categoria_ids.split(",") if x.strip().isdigit()]
+            if not ids:
+                return []
+            query = """
+                SELECT id, sku, title, description, price, stock_quantity, category_id, status
+                FROM producto
+                WHERE status = 'active' AND category_id = ANY($3::int[])
+                ORDER BY id
+                LIMIT $1 OFFSET $2
+            """
+            results = await conn.fetch(query, limit, skip, ids)
+        else:
+            query = """
+                SELECT id, sku, title, description, price, stock_quantity, category_id, status
+                FROM producto
+                WHERE status = 'active'
+                ORDER BY id
+                LIMIT $1 OFFSET $2
+            """
+            results = await conn.fetch(query, limit, skip)
+
+        return [dict(row) for row in results]
+    except Exception as e:
+        logger.error(f"Error obteniendo productos públicos por categorías: {e}")
+        raise HTTPException(
+            status_code=500, detail="Error al obtener productos públicos por categorías"
+        )
+
+
 # Endpoints adicionales
 @app.get("/api/categorias/", response_model=List[str])
 async def obtener_categorias(conn=Depends(get_db)):
