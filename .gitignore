@@ -2,27 +2,43 @@
 .DS_Store
 Thumbs.db
 .vscode/
+.vscode/*
 .idea/
 
 # Env files (keep only *.example tracked)
 .env
 .env.*
+.env.local
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
 !.env.*.example
 
 # Front (Vite/Node)
 Front/node_modules/
+node_modules/
 Front/dist/
+dist/
+build/
 Front/.eslintcache
 Front/npm-debug.log*
 Front/yarn-*.log
 Front/pnpm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Back (Python/Django)
 **/__pycache__/
+Back/Back/__pycache__/
 *.py[cod]
+*.pyc
 *.pyo
 *.pyd
+*.log
+*.pot
 *.egg-info/
 .venv/
 venv/
@@ -35,6 +51,7 @@ htmlcov/
 db.sqlite3
 media/
 staticfiles/
+local_settings.py
 
 # Elastic Beanstalk artifacts and logs
 Back/.elasticbeanstalk/app_versions/
