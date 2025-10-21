@@ -15,6 +15,7 @@ import MediaManager from "./components/MediaManager";
 import LandingPage from "./pages/LandingPage";
 import AdminPage from "./pages/AdminPage";
 import SearchPage from "./pages/SearchPage";
+import VerificationPage from "./pages/VerificationPage";
 
 const initialProducts = [
   { id: 1, name: "Producto 1" },
@@ -101,6 +102,7 @@ function AppRoutes({ isAuthenticated, onAuth, onLogout, products, onDelete }) {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/search" element={<SearchPage />} />
+      <Route path="/api/auth/verify-email" element={<VerificationPage />} />
       <Route
         path="/login"
         element={
