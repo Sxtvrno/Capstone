@@ -3,18 +3,19 @@ import {
   getProductos,
   API_URL,
   obtenerImagenesProducto,
-  getProductosPorCategorias,
+  getProductosPorCategoria,
   getCategorias,
 } from "../services/api";
 
 /**
  * ProductGrid
  * - Muestra productos en una cuadrícula responsiva
- * - Filtra productos según el término de búsqueda
+ * - Filtra productos según el término de búsqueda y categoría
  *
  * Props:
  * - searchQuery => término de búsqueda para filtrar
  * - onSelect(product) => callback al seleccionar un producto (opcional)
+ * - categoryIds => array de IDs de categorías para filtrar
  */
 export default function ProductGrid({
   searchQuery = "",
@@ -32,8 +33,8 @@ export default function ProductGrid({
     const fetchProducts = async () => {
       try {
         if (categoryIds && categoryIds.length > 0) {
-          // usar endpoint por categorias
-          const res = await getProductosPorCategorias(categoryIds, 0, 100);
+          // Usar el primer ID de categoría del array con límite de 1000
+          const res = await getProductosPorCategoria(categoryIds[0], 0, 1000);
           const list = res?.data ?? res ?? [];
           setProductos(list);
         } else {
@@ -49,7 +50,7 @@ export default function ProductGrid({
       }
     };
     fetchProducts();
-  }, [token, categoryIds]);
+  }, [categoryIds]); // Dependencia actualizada para reaccionar a cambios en categoryIds
 
   // Cargar categorías para mostrar nombre correctamente
   useEffect(() => {
@@ -64,9 +65,9 @@ export default function ProductGrid({
       }
     };
     fetchCategorias();
-  }, [token]);
+  }, []);
 
-  // Cargar imágenes de productos (misma lógica que StoreTemplateA)
+  // Cargar imágenes de productos
   useEffect(() => {
     if (!productos.length || !token) return;
 
@@ -79,14 +80,13 @@ export default function ProductGrid({
           }
         })
         .catch((err) => {
-          // ignore individual image errors
           console.error(
             `Error cargando imágenes del producto ${producto.id}`,
             err
           );
         });
     });
-  }, [productos, token, imagesMap]);
+  }, [productos, token]);
 
   const getCategoriaNombre = (id) => {
     const cat = categorias.find((c) => c.id === Number(id));
