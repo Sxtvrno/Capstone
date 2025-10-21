@@ -84,7 +84,7 @@ class EmailService:
     async def send_verification_email(self, email: str, token: str):
         """Envía email de verificación con diseño profesional"""
         verification_url = (
-            os.getenv("URL_BACK") + f"/api/auth/verify-email?token={token}"
+            f"https://d10nrn1yj450xr.cloudfront.net/api/auth/verify-email?token={token}"
         )
 
         subject = "🔐 Verifica tu correo electrónico"
