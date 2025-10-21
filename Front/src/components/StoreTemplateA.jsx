@@ -12,6 +12,8 @@ export default function StoreTemplateD({
 }) {
   const logoProp = logo || icon || logoSrc;
   const [imagesMap, setImagesMap] = useState({});
+  const [sortOrder, setSortOrder] = useState("nuevo");
+  const [toast, setToast] = useState({ show: false, message: "" });
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -56,6 +58,35 @@ export default function StoreTemplateD({
     };
   }, [products, token, imagesMap]);
 
+  // Función para mostrar toast
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => {
+      setToast({ show: false, message: "" });
+    }, 3000);
+  };
+
+  // Función para agregar al carrito
+  const handleAddToCart = (productName) => {
+    // Aquí puedes agregar la lógica para agregar al carrito
+    showToast(`${productName} agregado al carrito`);
+  };
+
+  // Función para ordenar productos
+  const sortedProducts = [...products].sort((a, b) => {
+    switch (sortOrder) {
+      case "precio-asc":
+        return (a.price || 0) - (b.price || 0);
+      case "precio-desc":
+        return (b.price || 0) - (a.price || 0);
+      case "nombre":
+        return (a.name || a.title || "").localeCompare(b.name || b.title || "");
+      case "nuevo":
+      default:
+        return 0;
+    }
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TemplateNavbar
@@ -63,6 +94,22 @@ export default function StoreTemplateD({
         logo={logoProp}
         headerColor={headerColor}
       />
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
 
       <main className="container mx-auto px-4 py-6">
         {/* Hero */}
@@ -101,18 +148,12 @@ export default function StoreTemplateD({
             Productos
           </h3>
           <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="w-44 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              onChange={(e) => setSearch(e.target.value)}
-            />
             <select
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              defaultValue="relevancia"
-              onChange={() => {}}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
             >
-              <option value="relevancia">Relevancia</option>
+              <option value="nuevo">Lo nuevo</option>
               <option value="precio-asc">Precio: menor a mayor</option>
               <option value="precio-desc">Precio: mayor a menor</option>
               <option value="nombre">Nombre</option>
@@ -122,7 +163,7 @@ export default function StoreTemplateD({
 
         {/* Grid de productos */}
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products.map((p) => {
+          {sortedProducts.map((p) => {
             const pid = p?.id ?? p?._id ?? p?.sku;
             const firstUrl = pid ? imagesMap[pid]?.[0] : undefined;
             const title = p.name || p.title || "Producto";
@@ -146,15 +187,6 @@ export default function StoreTemplateD({
                   ) : (
                     <div className="h-full w-full bg-gray-200" />
                   )}
-
-                  <button
-                    type="button"
-                    className="absolute top-2 right-2 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-gray-700 shadow hover:bg-white"
-                    onClick={() => {}}
-                    title="Favorito"
-                  >
-                    ♥
-                  </button>
                 </div>
 
                 <div className="p-3">
@@ -177,7 +209,7 @@ export default function StoreTemplateD({
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-                      onClick={() => {}}
+                      onClick={() => handleAddToCart(title)}
                     >
                       Agregar
                       <svg
@@ -203,6 +235,22 @@ export default function StoreTemplateD({
           reservados.
         </div>
       </footer>
+
+      <style jsx>{`
+        @keyframes slide-up {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
