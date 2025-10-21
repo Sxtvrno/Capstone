@@ -12,6 +12,8 @@ const ProductList = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [productoEdit, setProductoEdit] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const menuRef = useRef(null);
 
@@ -53,6 +55,17 @@ const ProductList = () => {
       .includes(search.toLowerCase())
   );
 
+  // Calcular paginación
+  const totalPages = Math.ceil(productosFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const productosPaginados = productosFiltrados.slice(startIndex, endIndex);
+
+  // Resetear a página 1 cuando cambia la búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
   const getCategoriaNombre = (id) => {
     const categoria = categorias.find((cat) => cat.id === Number(id));
     return categoria ? categoria.name : "—";
@@ -61,6 +74,114 @@ const ProductList = () => {
   const handleProductoCreado = (nuevoProducto) => {
     setProductos([...productos, nuevoProducto]);
     setCreateModalOpen(false);
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const renderPaginacion = () => {
+    if (totalPages <= 1) return null;
+
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    // Botón anterior
+    pages.push(
+      <button
+        key="prev"
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className={`px-3 py-2 rounded-md ${
+          currentPage === 1
+            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+            : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+        }`}
+      >
+        <i className="bi bi-chevron-left"></i>
+      </button>
+    );
+
+    // Primera página
+    if (startPage > 1) {
+      pages.push(
+        <button
+          key={1}
+          onClick={() => handlePageChange(1)}
+          className="px-4 py-2 rounded-md bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+        >
+          1
+        </button>
+      );
+      if (startPage > 2) {
+        pages.push(
+          <span key="dots1" className="px-2 text-gray-500">
+            ...
+          </span>
+        );
+      }
+    }
+
+    // Páginas visibles
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button
+          key={i}
+          onClick={() => handlePageChange(i)}
+          className={`px-4 py-2 rounded-md ${
+            currentPage === i
+              ? "bg-blue-600 text-white"
+              : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+          }`}
+        >
+          {i}
+        </button>
+      );
+    }
+
+    // Última página
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push(
+          <span key="dots2" className="px-2 text-gray-500">
+            ...
+          </span>
+        );
+      }
+      pages.push(
+        <button
+          key={totalPages}
+          onClick={() => handlePageChange(totalPages)}
+          className="px-4 py-2 rounded-md bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+        >
+          {totalPages}
+        </button>
+      );
+    }
+
+    // Botón siguiente
+    pages.push(
+      <button
+        key="next"
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className={`px-3 py-2 rounded-md ${
+          currentPage === totalPages
+            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+            : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+        }`}
+      >
+        <i className="bi bi-chevron-right"></i>
+      </button>
+    );
+
+    return pages;
   };
 
   return (
@@ -81,6 +202,18 @@ const ProductList = () => {
           <i className="bi bi-plus-circle"></i>
         </button>
       </div>
+
+      <div className="mb-4 flex items-center justify-between text-sm text-gray-600">
+        <span>
+          Mostrando {startIndex + 1} -{" "}
+          {Math.min(endIndex, productosFiltrados.length)} de{" "}
+          {productosFiltrados.length} productos
+        </span>
+        <span>
+          Página {currentPage} de {totalPages || 1}
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50">
@@ -96,8 +229,8 @@ const ProductList = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {productosFiltrados.length > 0 ? (
-              productosFiltrados.map((producto) => (
+            {productosPaginados.length > 0 ? (
+              productosPaginados.map((producto) => (
                 <tr
                   key={producto.id}
                   className="hover:bg-gray-50 transition-colors"
@@ -218,6 +351,14 @@ const ProductList = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          {renderPaginacion()}
+        </div>
+      )}
+
       {editModalOpen && productoEdit && (
         <EditProductForm
           producto={productoEdit}

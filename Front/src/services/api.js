@@ -54,7 +54,7 @@ export const register = async (
 export const getProductos = async (onAuthError) => {
   const token = localStorage.getItem("token");
   try {
-    return await axios.get(`${API_URL}/api/productos/`, {
+    return await axios.get(`${API_URL}/api/productos/?skip=0&limit=1000`, {
       headers: {
         accept: "application/json",
         Authorization: `Bearer ${token}`,
@@ -187,25 +187,23 @@ export const getCategorias = async (onAuthError) => {
   }
 };
 
-export const getProductosPorCategorias = async (
-  categoriaIds = null,
+export const getProductosPorCategoria = async (
+  categoria_id,
   skip = 0,
-  limit = 100,
+  limit = 1000,
   onAuthError
 ) => {
   const token = localStorage.getItem("token");
   try {
-    const params = { skip, limit };
-    if (categoriaIds) {
-      params.categoria_ids = Array.isArray(categoriaIds)
-        ? categoriaIds.join(",")
-        : categoriaIds;
-    }
-    return await axios.get(`${API_URL}/api/productos/por-categorias`, {
-      params,
+    return await axios.get(`${API_URL}/api/productos/`, {
       headers: {
         accept: "application/json",
         Authorization: `Bearer ${token}`,
+      },
+      params: {
+        categoria_id,
+        skip,
+        limit,
       },
     });
   } catch (error) {
