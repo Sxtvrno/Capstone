@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 function getContrastColor(hex) {
   try {
@@ -20,31 +21,50 @@ function getContrastColor(hex) {
   }
 }
 
-export default function TemplateNavbar({
+const TemplateNavbar = ({
   storeName = "Mi Tienda",
-  links = ["Inicio", "Productos", "Contacto"],
   logo, // data URL o URL del logo
   icon, // alias opcional; si llega, también se usa como logo
   headerColor = "#111827", // color del header desde CustomizeStore
-}) {
+}) => {
+  const navigate = useNavigate();
   const bg = headerColor || "#111827";
   const fg = getContrastColor(bg);
   const logoSrc = logo || icon;
 
-  const navStyle = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 20px",
-    background: bg,
-    color: fg,
-    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+  const handleLogoClick = () => {
+    navigate("/");
   };
-  const linksStyle = { display: "flex", gap: 12, alignItems: "center" };
+
+  const handleProductsClick = () => {
+    navigate("/search");
+  };
 
   return (
-    <header style={navStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <header
+      style={{
+        backgroundColor: bg,
+        color: "#fff",
+        padding: "12px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+      }}
+    >
+      {/* Logo / Store Name */}
+      <div
+        onClick={handleLogoClick}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          cursor: "pointer",
+          transition: "opacity 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+      >
         {logoSrc ? (
           <img
             src={logoSrc}
@@ -52,10 +72,8 @@ export default function TemplateNavbar({
             style={{
               width: 40,
               height: 40,
-              objectFit: "cover",
-              borderRadius: "50%",
-              background: "#fff",
-              border: `2px solid ${fg}22`,
+              objectFit: "contain",
+              borderRadius: 4,
             }}
           />
         ) : (
@@ -69,23 +87,58 @@ export default function TemplateNavbar({
             }}
           />
         )}
-        <strong style={{ color: fg }}>{storeName}</strong>
+        <span style={{ fontSize: 20, fontWeight: 600 }}>{storeName}</span>
       </div>
-      <nav style={linksStyle}>
-        {links.map((l) => (
-          <a
-            key={l}
-            href="#"
-            style={{
-              color: fg === "#ffffff" ? "#e5e7eb" : "#1f2937",
-              textDecoration: "none",
-              fontSize: 14,
-            }}
-          >
-            {l}
-          </a>
-        ))}
+
+      {/* Navigation */}
+      <nav style={{ display: "flex", gap: 24, alignItems: "center" }}>
+        <button
+          onClick={handleLogoClick}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 16,
+            fontWeight: 500,
+            padding: "8px 12px",
+            borderRadius: 4,
+            transition: "background-color 0.2s",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
+        >
+          Inicio
+        </button>
+        <button
+          onClick={handleProductsClick}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 16,
+            fontWeight: 500,
+            padding: "8px 12px",
+            borderRadius: 4,
+            transition: "background-color 0.2s",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
+        >
+          Productos
+        </button>
       </nav>
     </header>
   );
-}
+};
+
+export default TemplateNavbar;

@@ -16,6 +16,7 @@ import LandingPage from "./pages/LandingPage";
 import AdminPage from "./pages/AdminPage";
 import SearchPage from "./pages/SearchPage";
 import VerificationPage from "./pages/VerificationPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
 
 const initialProducts = [
   { id: 1, name: "Producto 1" },
@@ -115,6 +116,7 @@ function AppRoutes({ isAuthenticated, onAuth, onLogout, products, onDelete }) {
           )
         }
       />
+      <Route path="/product/:id" element={<ProductDetailPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

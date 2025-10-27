@@ -151,3 +151,24 @@ CREATE INDEX IF NOT EXISTS idx_pedido_usuario ON Pedido (usuario_id);
 CREATE INDEX IF NOT EXISTS idx_pago_pedido ON Pago (order_id);
 
 CREATE INDEX IF NOT EXISTS idx_interaccion_usuario ON InteraccionChatbot (user_id);
+-- Función para actualizar el estado del producto basado en el stock
+CREATE OR REPLACE FUNCTION actualizar_estado_producto()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Verificar si el stock es 0 o menos y actualizar el estado
+    IF NEW.stock_quantity <= 0 THEN
+        NEW.status = 'No disponible';
+    ELSIF NEW.stock_quantity > 0 AND OLD.status = 'No disponible' THEN
+        -- Si el stock vuelve a ser positivo y estaba como "No disponible", reactivarlo
+        NEW.status = 'activo';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger que se ejecuta antes de actualizar o insertar un producto
+CREATE OR REPLACE TRIGGER trigger_actualizar_estado_producto
+    BEFORE INSERT OR UPDATE OF stock_quantity ON Producto
+    FOR EACH ROW
+    EXECUTE FUNCTION actualizar_estado_producto();
