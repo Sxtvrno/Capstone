@@ -2,6 +2,31 @@ import axios from "axios";
 
 export const API_URL = import.meta.env.VITE_BACK_URL;
 
+// Crear instancia de axios con configuración base
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    accept: "application/json",
+    "Content-Type": "application/json",
+  },
+});
+
+// Interceptor para agregar token automáticamente
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+
 export const login = async (username, password) => {
   const response = await axios.post(
     `${API_URL}/api/auth/login`,
@@ -212,4 +237,24 @@ export const getProductosPorCategoria = async (
     }
     throw error;
   }
+};
+
+// Obtener configuración de la tienda
+export const getStoreConfig = async (token) => {
+  const response = await api.get("/api/configuracion/", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+// Obtener un producto por ID
+export const getProductoById = async (id, token) => {
+  const response = await api.get(`/api/productos/${id}/`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
 };

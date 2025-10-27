@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TemplateNavbar from "./TemplateNavbar";
 import { obtenerImagenesProducto } from "../services/api";
 
@@ -10,6 +11,7 @@ export default function StoreTemplateD({
   logoSrc, // compat opcional
   headerColor = "#111827",
 }) {
+  const navigate = useNavigate();
   const logoProp = logo || icon || logoSrc;
   const [imagesMap, setImagesMap] = useState({});
   const [sortOrder, setSortOrder] = useState("nuevo");
@@ -66,9 +68,14 @@ export default function StoreTemplateD({
     }, 3000);
   };
 
+  // Función para navegar al detalle del producto
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
+  };
+
   // Función para agregar al carrito
-  const handleAddToCart = (productName) => {
-    // Aquí puedes agregar la lógica para agregar al carrito
+  const handleAddToCart = (e, productName) => {
+    e.stopPropagation(); // Prevenir que se active el click del producto
     showToast(`${productName} agregado al carrito`);
   };
 
@@ -175,7 +182,8 @@ export default function StoreTemplateD({
             return (
               <article
                 key={pid || title}
-                className="group bg-white rounded-xl shadow-sm ring-1 ring-gray-200 hover:shadow-md transition overflow-hidden"
+                onClick={() => handleProductClick(pid)}
+                className="group bg-white rounded-xl shadow-sm ring-1 ring-gray-200 hover:shadow-md transition overflow-hidden cursor-pointer"
               >
                 <div className="relative bg-gray-100 aspect-square overflow-hidden">
                   {firstUrl ? (
@@ -209,7 +217,7 @@ export default function StoreTemplateD({
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-                      onClick={() => handleAddToCart(title)}
+                      onClick={(e) => handleAddToCart(e, title)}
                     >
                       Agregar
                       <svg

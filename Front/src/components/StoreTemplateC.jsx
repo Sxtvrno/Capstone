@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TemplateNavbar from "./TemplateNavbar";
 import { obtenerImagenesProducto } from "../services/api";
 
@@ -14,6 +15,7 @@ export default function StoreTemplateC(props) {
     ...rest
   } = props;
 
+  const navigate = useNavigate();
   const logoProp = logo || icon || logoSrc;
   const [imagesMap, setImagesMap] = useState({});
   const token = localStorage.getItem("token");
@@ -60,6 +62,15 @@ export default function StoreTemplateC(props) {
     };
   }, [products, token, imagesMap]);
 
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
+  };
+
+  const handleViewClick = (e, productId) => {
+    e.stopPropagation();
+    navigate(`/product/${productId}`);
+  };
+
   const list = {
     display: "flex",
     flexDirection: "column",
@@ -76,6 +87,8 @@ export default function StoreTemplateC(props) {
     padding: 12,
     borderRadius: 8,
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    cursor: "pointer",
+    transition: "all 0.2s",
   };
   const img = { width: 220, height: 140, objectFit: "cover", borderRadius: 6 };
 
@@ -92,7 +105,21 @@ export default function StoreTemplateC(props) {
             const pid = p?.id ?? p?._id ?? p?.sku;
             const firstUrl = pid ? imagesMap[pid]?.[0] : undefined;
             return (
-              <article key={pid || p?.title || p?.name} style={row}>
+              <article
+                key={pid || p?.title || p?.name}
+                style={row}
+                onClick={() => handleProductClick(pid)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0,0,0,0.12)";
+                  e.currentTarget.style.transform = "translateX(4px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 4px rgba(0,0,0,0.06)";
+                  e.currentTarget.style.transform = "translateX(0)";
+                }}
+              >
                 <div
                   style={{
                     width: img.width,
@@ -137,7 +164,9 @@ export default function StoreTemplateC(props) {
                           border: "none",
                           padding: "6px 8px",
                           borderRadius: 6,
+                          cursor: "pointer",
                         }}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Comprar
                       </button>
@@ -147,7 +176,9 @@ export default function StoreTemplateC(props) {
                           border: "1px solid #e5e7eb",
                           padding: "6px 8px",
                           borderRadius: 6,
+                          cursor: "pointer",
                         }}
+                        onClick={(e) => handleViewClick(e, pid)}
                       >
                         Ver
                       </button>

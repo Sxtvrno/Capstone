@@ -3,6 +3,7 @@ import { getProductos, deleteProducto, API_URL } from "../services/api";
 import EditProductForm from "./EditProductForm";
 import ProductForm from "./ProductForm";
 import "bootstrap-icons/font/bootstrap-icons.css";
+import { useNavigate } from "react-router-dom";
 
 const ProductList = () => {
   const [productos, setProductos] = useState([]);
@@ -16,6 +17,7 @@ const ProductList = () => {
   const itemsPerPage = 10;
 
   const menuRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -182,6 +184,10 @@ const ProductList = () => {
     );
 
     return pages;
+  };
+
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
   };
 
   return (
