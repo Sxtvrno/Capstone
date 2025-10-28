@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TemplateNavbar from "./TemplateNavbar";
 import { obtenerImagenesProducto } from "../services/api";
 
@@ -10,6 +11,7 @@ export default function StoreTemplateB({
   logoSrc, // compat opcional
   headerColor = "#111827",
 }) {
+  const navigate = useNavigate();
   const logoProp = logo || icon || logoSrc;
   const [imagesMap, setImagesMap] = useState({});
   const token = localStorage.getItem("token");
@@ -56,6 +58,10 @@ export default function StoreTemplateB({
     };
   }, [products, token, imagesMap]);
 
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
+  };
+
   return (
     <div>
       <TemplateNavbar
@@ -90,11 +96,24 @@ export default function StoreTemplateB({
             return (
               <article
                 key={pid || p?.name || p?.title}
+                onClick={() => handleProductClick(pid)}
                 style={{
                   borderRadius: 12,
                   overflow: "hidden",
                   background: "#fff",
                   boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0,0,0,0.12)";
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 2px rgba(0,0,0,0.06)";
+                  e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
                 <div
@@ -102,6 +121,7 @@ export default function StoreTemplateB({
                     width: "100%",
                     aspectRatio: "4/3",
                     background: "#f3f4f6",
+                    overflow: "hidden",
                   }}
                 >
                   {firstUrl && (
@@ -112,6 +132,13 @@ export default function StoreTemplateB({
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
+                        transition: "transform 0.3s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "scale(1.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "scale(1)";
                       }}
                     />
                   )}
