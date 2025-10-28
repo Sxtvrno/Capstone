@@ -6,6 +6,7 @@ import {
   getProductosPorCategoria,
   getCategorias,
 } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 /**
  * ProductGrid
@@ -27,6 +28,7 @@ export default function ProductGrid({
   const [loading, setLoading] = useState(true);
   const [imagesMap, setImagesMap] = useState({});
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -111,6 +113,10 @@ export default function ProductGrid({
     );
   });
 
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -187,7 +193,7 @@ export default function ProductGrid({
             <article
               key={producto.id}
               className="group bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer"
-              onClick={() => onSelect?.(producto)}
+              onClick={() => handleProductClick(producto.id)}
             >
               {/* Imagen del producto */}
               <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
