@@ -251,7 +251,7 @@ export const getStoreConfig = async (token) => {
 
 // Obtener un producto por ID
 export const getProductoById = async (id, token) => {
-  const response = await api.get(`/api/productos/${id}/`, {
+  const response = await axios.get(`${API_URL}/api/productos/${id}/`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
