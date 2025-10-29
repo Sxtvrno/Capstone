@@ -367,6 +367,8 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:8001",
+    # Producción (CloudFront)
+    "https://d10nrn1yj450xr.cloudfront.net",
 ]
 app.add_middleware(
     CORSMiddleware,
