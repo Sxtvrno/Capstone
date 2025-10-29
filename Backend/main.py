@@ -76,7 +76,7 @@ class EmailService:
 
     async def send_verification_email(self, email: str, token: str):
         verification_url = (
-            os.getenv("URL_BACK") or "http://localhost:8001"
+            os.getenv("URL_BACKEND") or "http://localhost:8001"
         ) + f"/api/auth/verify-email?token={token}"
         subject = "Verifica tu correo electrónico"
         html_body = f"""
