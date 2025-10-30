@@ -436,6 +436,52 @@ export const emailAPI = {
   },
 };
 
+const BASE_URL = import.meta.env.VITE_BACK_URL || "http://localhost:8001";
+
+function getAuthHeaders() {
+  const token =
+    localStorage.getItem("access_token") || localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export const transbankAPI = {
+  async createTransaction({ amount, sessionId, returnUrl, pedidoId }) {
+    const body = {
+      amount: Math.max(1, Math.trunc(Number(amount) || 0)),
+      session_id: sessionId || null,
+      return_url: returnUrl || null,
+      pedido_id: pedidoId || null,
+    };
+    const res = await fetch(`${BASE_URL}/api/transbank/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      let msg = "Error al crear transacción";
+      try {
+        const t = await res.json();
+        msg = t.detail || JSON.stringify(t);
+      } catch {}
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  async confirmTransaction(tokenWs) {
+    const res = await fetch(`${BASE_URL}/api/transbank/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token_ws: tokenWs }),
+    });
+    if (!res.ok) {
+      const t = await res.json().catch(() => ({}));
+      throw new Error(t.detail || "Error al confirmar transacción");
+    }
+    return res.json();
+  },
+};
+
 // Exportar funciones legacy para compatibilidad (deprecadas)
 export const login = authAPI.login;
 export const register = authAPI.register;
@@ -477,5 +523,6 @@ export default {
   adminAPI,
   healthAPI,
   emailAPI,
+  transbankAPI,
   API_URL,
 };

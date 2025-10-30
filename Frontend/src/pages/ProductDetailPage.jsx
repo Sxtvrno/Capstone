@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ProductDetail from "../components/ProductDetail";
 import RelatedProducts from "../components/RelatedProducts";
-import TemplateNavbar from "../components/TemplateNavbar";
 import { productAPI } from "../services/api";
+import { useCart } from "../contexts/CartContext";
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
   const [product, setProduct] = useState(null);
   const [productImages, setProductImages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,11 +101,6 @@ const ProductDetailPage = () => {
   if (loading) {
     return (
       <>
-        <TemplateNavbar
-          storeName={storeName}
-          logo={logo}
-          headerColor={headerColor}
-        />
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -118,11 +114,6 @@ const ProductDetailPage = () => {
   if (error || !product) {
     return (
       <>
-        <TemplateNavbar
-          storeName={storeName}
-          logo={logo}
-          headerColor={headerColor}
-        />
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center max-w-md mx-auto px-4">
             <svg
@@ -164,7 +155,6 @@ const ProductDetailPage = () => {
     );
   }
 
-  // Combinar datos del producto con las imágenes cargadas
   const productWithImages = {
     ...product,
     name: product.nombre || product.name || product.title,
@@ -175,7 +165,6 @@ const ProductDetailPage = () => {
     images: productImages.length > 0 ? productImages : [],
   };
 
-  // Obtener ID y nombre de la categoría
   const categoryId =
     product.categoria_id || product.categoryId || product.category_id;
   const categoryName =
@@ -186,14 +175,13 @@ const ProductDetailPage = () => {
 
   return (
     <>
-      <TemplateNavbar
-        storeName={storeName}
-        logo={logo}
-        headerColor={headerColor}
+      <ProductDetail
+        product={productWithImages}
+        onAddToCart={() => addToCart(productWithImages, 1)}
       />
-      <ProductDetail product={productWithImages} />
 
-      {/* Productos relacionados */}
+      <div className="max-w-7xl mx-auto px-4 py-6"></div>
+
       {categoryId && (
         <RelatedProducts
           currentProductId={id}
