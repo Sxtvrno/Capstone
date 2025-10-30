@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import React, { useContext, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { CartContext } from "../contexts/CartContext";
 import { categoryAPI } from "../services/api";
-import TemplateNavbar from "../components/TemplateNavbar";
 import ProductSearch from "../components/ProductSearch";
 import ProductGrid from "../components/ProductGrid";
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { addToCart } = useContext(CartContext);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [selectedCategory, setSelectedCategory] = useState(
     searchParams.get("category") ? parseInt(searchParams.get("category")) : null
@@ -97,6 +98,8 @@ export default function SearchPage() {
     setSearchParams({});
   };
 
+  const handleAddToCart = (product) => addToCart(product, 1);
+
   // Obtener el nombre de la categoría seleccionada
   const getSelectedCategoryName = () => {
     if (!selectedCategory) return null;
@@ -106,17 +109,11 @@ export default function SearchPage() {
 
   const hasFilters = query || selectedCategory;
 
+  // Ejemplo de resultados de búsqueda (esto debería venir de tu estado o props)
+  const searchResults = []; // Reemplaza esto con tus resultados de búsqueda
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="w-full sticky top-0 z-50 shadow-sm">
-        <TemplateNavbar
-          storeName={storeName}
-          logo={logo}
-          headerColor={headerColor}
-          className="w-full"
-        />
-      </header>
-
       <main className="flex-1 pt-4 md:pt-6 pb-8 w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           {/* Breadcrumb */}
@@ -259,6 +256,42 @@ export default function SearchPage() {
               />
             </div>
           </section>
+
+          {/* Search Results Example - Reemplaza esto con tu lógica de resultados */}
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              Resultados de Búsqueda
+            </h2>
+
+            {searchResults.length === 0 ? (
+              <p className="text-gray-500">No se encontraron productos.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {searchResults.map((product) => (
+                  <div
+                    key={product.id}
+                    className="border p-4 bg-white rounded-lg shadow"
+                  >
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {product.name}
+                    </h3>
+                    <p className="text-gray-700 mb-4">{product.description}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-gray-900">
+                        ${product.price}
+                      </span>
+                      <button
+                        onClick={() => handleAddToCart(product)}
+                        className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                      >
+                        Agregar al Carrito
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
 

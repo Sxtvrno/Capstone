@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const ProductDetail = ({ product }) => {
+export default function ProductDetail({ product, onAddToCart }) {
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -48,7 +48,7 @@ const ProductDetail = ({ product }) => {
   const hasImages = images.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Toast Notification */}
       {toast.show && (
         <div className="fixed top-4 right-4 z-50 animate-slide-down">
@@ -282,25 +282,11 @@ const ProductDetail = ({ product }) => {
               </div>
 
               {/* Botones de acción */}
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="mt-4 flex gap-3">
                 <button
-                  onClick={handleAddToCart}
-                  disabled={product.stock === 0}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  onClick={onAddToCart}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
                   Agregar al carrito
                 </button>
                 <button
@@ -385,6 +371,4 @@ const ProductDetail = ({ product }) => {
       `}</style>
     </div>
   );
-};
-
-export default ProductDetail;
+}
