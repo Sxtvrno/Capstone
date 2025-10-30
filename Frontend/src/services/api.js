@@ -253,9 +253,15 @@ export const productAPI = {
   },
 
   async addImages(productId, images) {
+    // images debe ser array de {url_imagen: "..."}
+    const payload = Array.isArray(images) ? images : [{ url_imagen: images }];
+
     const response = await axios.post(
       `${API_URL}/api/productos/${productId}/imagenes`,
-      images
+      payload,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
     );
     return response.data;
   },
