@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { CartContext } from "../contexts/CartContext";
 import { authAPI } from "../services/api";
 
 function getContrastColor(hex) {
@@ -24,12 +25,13 @@ function getContrastColor(hex) {
 
 const TemplateNavbar = ({
   storeName = "Mi Tienda",
-  logo, // data URL o URL del logo
-  icon, // alias opcional; si llega, también se usa como logo
-  headerColor = "#111827", // color del header desde CustomizeStore
+  logo,
+  icon,
+  headerColor = "#111827",
   className = "",
 }) => {
   const navigate = useNavigate();
+  const { totalItems } = useContext(CartContext); // contador del carrito
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,7 +97,7 @@ const TemplateNavbar = ({
   return (
     <nav
       className={`w-full border-b shadow-sm ${className}`}
-      style={{ backgroundColor: headerColor }}
+      style={{ backgroundColor: bg, color: fg }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
@@ -163,14 +165,14 @@ const TemplateNavbar = ({
 
           {/* Botones de navegación - Desktop */}
           <div className="hidden md:flex items-center gap-4">
-            {/* Botón de búsqueda móvil */}
+            {/* Botón de ver carrito */}
             <button
-              onClick={() => navigate("/search")}
-              className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-              title="Buscar"
+              onClick={() => navigate("/checkout")}
+              className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+              title="Ver carrito"
             >
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -179,9 +181,13 @@ const TemplateNavbar = ({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  d="M3 3h2l.4 2M7 13h10l3-8H6.4M7 13L5.4 5M7 13l-2 7h12m0 0a2 2 0 100 4 2 2 0 000-4m-12 0a2 2 0 100 4 2 2 0 000-4"
                 />
               </svg>
+              <span>Carrito</span>
+              <span className="ml-1 inline-flex items-center justify-center text-xs font-semibold bg-white text-blue-600 rounded-full w-5 h-5">
+                {totalItems}
+              </span>
             </button>
 
             {/* Botón de Admin (solo si es admin) */}

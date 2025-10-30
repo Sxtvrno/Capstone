@@ -1,20 +1,35 @@
 from django.conf import settings
-from fastapi import FastAPI, HTTPException, Depends, status, Security
+from fastapi import FastAPI, HTTPException, Depends, status, Security, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from fastapi import Body
+from fastapi.exceptions import RequestValidationError
 from typing import List, Optional
 import os
 import django
 import asyncpg
 from asyncpg.pool import Pool
 import logging
-from jose import JWTError, jwt  # noqa: F401
+from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from transbank.common.options import Options
+from transbank.webpay.webpay_plus.transaction import Transaction
+from transbank.common.integration_type import IntegrationType
+from transbank.common.integration_commerce_codes import IntegrationCommerceCodes
+from transbank.common.integration_api_keys import IntegrationApiKeys
+import transbank.webpay.webpay_plus.transaction as tr
+from fastapi.responses import HTMLResponse, RedirectResponse
+import secrets
+
+try:
+    from transbank.common.options import WebpayOptions
+except Exception:
+    WebpayOptions = None
 
 # Configurar Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Back.settings")
@@ -34,6 +49,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 ROLE_ADMIN = "admin"
 ROLE_CLIENTE = "cliente"
+FRONTEND_URL = getattr(
+    settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "http://localhost:5173")
+)
 
 
 # Servicio Email
@@ -311,6 +329,112 @@ class DireccionResponse(BaseModel):
         from_attributes = True
 
 
+# ==================== TRANSBANK SCHEMAS Y ESTADO EN MEMORIA ====================
+# Añadir estos modelos ANTES de definir los endpoints de Transbank
+
+
+class TransbankCreateRequest(BaseModel):
+    pedido_id: int
+    session_id: Optional[str] = None
+
+
+class TransbankCreateResponse(BaseModel):
+    token: str
+    url: str
+    pedido_id: int
+
+
+class TransbankConfirmResponse(BaseModel):
+    status: str
+    message: str
+    pedido_id: Optional[int] = None
+    amount: Optional[float] = None
+    authorization_code: Optional[str] = None
+    transaction_date: Optional[str] = None
+    payment_type_code: Optional[str] = None
+    card_number: Optional[str] = None
+    payment_id: Optional[int] = None
+
+
+class TransbankStatusResponse(BaseModel):
+    status: str
+    amount: Optional[float] = None
+    buy_order: Optional[str] = None
+    authorization_code: Optional[str] = None
+
+
+class TransbankRefundRequest(BaseModel):
+    amount: float
+
+
+class TransbankRefundResponse(BaseModel):
+    type: str
+    authorization_code: Optional[str] = None
+    authorization_date: Optional[str] = None
+    nullified_amount: Optional[float] = None
+    balance: Optional[float] = None
+
+
+class PagoResponse(BaseModel):
+    payment_id: int
+    order_id: int
+    payment_method: str
+    payment_status: str
+    transaction_id: str
+    amount: float
+    payment_date: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Almacenamiento temporal de transacciones (token_ws -> metadata)
+pending_transactions: dict = {}
+
+
+# ==================== MODELOS DE PAGO ====================
+class CheckoutRequest(BaseModel):
+    direccion_envio: str
+    ciudad: str
+    region: str
+    codigo_postal: str
+    telefono: str
+    notas: Optional[str] = None
+
+
+class PaymentInitResponse(BaseModel):
+    token: str
+    url: str
+
+
+class PaymentStatus(BaseModel):
+    order_id: int
+    status: str
+    amount: float
+    payment_date: Optional[datetime] = None
+
+
+# ===== Modelos Transbank: aceptar snake_case y camelCase =====
+class TBKCreateRequest(BaseModel):
+    amount: int = Field(..., alias="amount")
+    session_id: Optional[str] = Field(None, alias="sessionId")
+    return_url: Optional[str] = Field(None, alias="returnUrl")
+    pedido_id: Optional[int] = Field(None, alias="pedidoId")
+
+    class Config:
+        allow_population_by_field_name = True
+        extra = "ignore"
+
+
+class TBKCreateResponse(BaseModel):
+    token: str
+    url: str
+
+
+class TBKConfirmRequest(BaseModel):
+    token_ws: str
+
+
 # Password utils
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -537,6 +661,462 @@ async def get_current_admin(user: dict = Depends(get_current_user)):
             status_code=status.HTTP_403_FORBIDDEN, detail="Requiere rol administrador"
         )
     return user
+
+
+# ==================== MODELOS DEL CARRITO ====================
+
+
+class CartAddItemRequest(BaseModel):
+    producto_id: int
+    quantity: int = 1
+
+
+class CartUpdateItemRequest(BaseModel):
+    quantity: int
+
+
+class CartItemResponse(BaseModel):
+    producto_id: int
+    title: str
+    unit_price: float
+    quantity: int
+    total_price: float
+    stock_quantity: int
+
+
+class CartResponse(BaseModel):
+    cart_id: int
+    items: List[CartItemResponse]
+    total_items: int
+    subtotal: float
+
+
+class CartMergeRequest(BaseModel):
+    session_id: str
+
+
+# ==================== DEPENDENCIAS DE AUTENTICACIÓN OPCIONAL ====================
+
+optional_security = HTTPBearer(auto_error=False)
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(optional_security),
+    conn=Depends(get_db),
+) -> Optional[dict]:
+    if not credentials:
+        return None
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        role: Optional[str] = payload.get("role")
+        if not email:
+            return None
+        user = await get_user_by_email(email, conn)
+        if not user:
+            return None
+        if role and user.get("role") != role:
+            return None
+        if (
+            user.get("role") == ROLE_CLIENTE
+            and user.get("verification_status") != "verificado"
+        ):
+            return None
+        if user.get("role") == ROLE_ADMIN and user.get("is_active") is False:
+            return None
+        return user
+    except Exception:
+        return None
+
+
+# ==================== HELPERS DE CARRITO ====================
+async def get_or_create_cart(
+    conn, *, cliente_id: Optional[int] = None, session_id: Optional[str] = None
+):
+    if not cliente_id and not session_id:
+        raise HTTPException(status_code=400, detail="Se requiere cliente o session_id")
+    if cliente_id:
+        cart = await conn.fetchrow(
+            "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
+        )
+        if not cart:
+            cart = await conn.fetchrow(
+                "INSERT INTO Carrito (cliente_id) VALUES ($1) RETURNING id", cliente_id
+            )
+        return cart["id"]
+    else:
+        cart = await conn.fetchrow(
+            "SELECT id FROM Carrito WHERE session_id = $1", session_id
+        )
+        if not cart:
+            cart = await conn.fetchrow(
+                "INSERT INTO Carrito (session_id) VALUES ($1) RETURNING id", session_id
+            )
+        return cart["id"]
+
+
+async def get_cart_summary(conn, cart_id: int) -> CartResponse:
+    rows = await conn.fetch(
+        """
+        SELECT ac.producto_id,
+               ac.quantity,
+               ac.total_price,
+               p.title,
+               p.price AS unit_price,
+               p.stock_quantity
+        FROM ArticuloCarrito ac
+        JOIN Producto p ON p.id = ac.producto_id
+        WHERE ac.carrito_id = $1
+        ORDER BY ac.producto_id
+        """,
+        cart_id,
+    )
+    items = [
+        {
+            "producto_id": r["producto_id"],
+            "title": r["title"],
+            "unit_price": float(r["unit_price"]),
+            "quantity": r["quantity"],
+            "total_price": float(r["total_price"]),
+            "stock_quantity": r["stock_quantity"],
+        }
+        for r in rows
+    ]
+    subtotal = float(sum(r["total_price"] for r in rows)) if rows else 0.0
+    total_items = int(sum(r["quantity"] for r in rows)) if rows else 0
+    return {
+        "cart_id": cart_id,
+        "items": items,
+        "total_items": total_items,
+        "subtotal": subtotal,
+    }
+
+
+async def ensure_product_and_price(conn, producto_id: int):
+    prod = await conn.fetchrow(
+        "SELECT id, price, stock_quantity, status FROM Producto WHERE id = $1",
+        producto_id,
+    )
+    if not prod:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if prod["status"] != "activo":
+        raise HTTPException(status_code=400, detail="Producto no disponible")
+    return prod
+
+
+# ==================== ENDPOINTS DEL CARRITO ====================
+@app.get("/api/cart", response_model=CartResponse)
+async def get_cart(
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Obtener el carrito.
+    - Cliente autenticado: ignorará session_id y usará su carrito.
+    - Anónimo: requiere session_id.
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+    await conn.execute(
+        "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+    )
+    return await get_cart_summary(conn, cart_id)
+
+
+@app.post("/api/cart/items", response_model=CartResponse)
+async def add_item_cart(
+    payload: CartAddItemRequest,
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Agregar un producto al carrito (o incrementar su cantidad).
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+    if payload.quantity <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+    prod = await ensure_product_and_price(conn, payload.producto_id)
+
+    # Verificar existencia de item
+    existing = await conn.fetchrow(
+        "SELECT quantity FROM ArticuloCarrito WHERE carrito_id = $1 AND producto_id = $2",
+        cart_id,
+        payload.producto_id,
+    )
+    new_qty = payload.quantity + (existing["quantity"] if existing else 0)
+
+    # Opcional: validar stock disponible
+    if new_qty > prod["stock_quantity"]:
+        new_qty = prod["stock_quantity"]
+
+    total_price = float(prod["price"]) * new_qty
+
+    async with conn.transaction():
+        if existing:
+            await conn.execute(
+                """
+                UPDATE ArticuloCarrito
+                SET quantity = $1, total_price = $2
+                WHERE carrito_id = $3 AND producto_id = $4
+                """,
+                new_qty,
+                total_price,
+                cart_id,
+                payload.producto_id,
+            )
+        else:
+            await conn.execute(
+                """
+                INSERT INTO ArticuloCarrito (carrito_id, producto_id, quantity, total_price)
+                VALUES ($1, $2, $3, $4)
+                """,
+                cart_id,
+                payload.producto_id,
+                new_qty,
+                total_price,
+            )
+        await conn.execute(
+            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+        )
+
+    return await get_cart_summary(conn, cart_id)
+
+
+@app.put("/api/cart/items/{producto_id}", response_model=CartResponse)
+async def update_item_cart(
+    producto_id: int,
+    payload: CartUpdateItemRequest,
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Actualizar cantidad de un item del carrito. Si quantity = 0, elimina el item.
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+    if payload.quantity < 0:
+        raise HTTPException(status_code=400, detail="Cantidad inválida")
+
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+
+    existing = await conn.fetchrow(
+        "SELECT quantity FROM ArticuloCarrito WHERE carrito_id = $1 AND producto_id = $2",
+        cart_id,
+        producto_id,
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="El producto no está en el carrito")
+
+    if payload.quantity == 0:
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM ArticuloCarrito WHERE carrito_id = $1 AND producto_id = $2",
+                cart_id,
+                producto_id,
+            )
+            await conn.execute(
+                "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+                cart_id,
+            )
+        return await get_cart_summary(conn, cart_id)
+
+    prod = await ensure_product_and_price(conn, producto_id)
+    new_qty = min(payload.quantity, prod["stock_quantity"])
+    total_price = float(prod["price"]) * new_qty
+
+    async with conn.transaction():
+        await conn.execute(
+            """
+            UPDATE ArticuloCarrito
+            SET quantity = $1, total_price = $2
+            WHERE carrito_id = $3 AND producto_id = $4
+            """,
+            new_qty,
+            total_price,
+            cart_id,
+            producto_id,
+        )
+        await conn.execute(
+            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+        )
+
+    return await get_cart_summary(conn, cart_id)
+
+
+@app.delete("/api/cart/items/{producto_id}", response_model=CartResponse)
+async def remove_item_cart(
+    producto_id: int,
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Eliminar un producto del carrito.
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+
+    async with conn.transaction():
+        await conn.execute(
+            "DELETE FROM ArticuloCarrito WHERE carrito_id = $1 AND producto_id = $2",
+            cart_id,
+            producto_id,
+        )
+        await conn.execute(
+            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+        )
+
+    return await get_cart_summary(conn, cart_id)
+
+
+@app.post("/api/cart/clear", response_model=CartResponse)
+async def clear_cart(
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Vaciar el carrito.
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+
+    async with conn.transaction():
+        await conn.execute("DELETE FROM ArticuloCarrito WHERE carrito_id = $1", cart_id)
+        await conn.execute(
+            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+        )
+
+    return await get_cart_summary(conn, cart_id)
+
+
+@app.post("/api/cart/merge", response_model=CartResponse)
+async def merge_cart(
+    payload: CartMergeRequest,
+    user: dict = Depends(get_current_user),  # requiere login
+    conn=Depends(get_db),
+):
+    """
+    Fusionar carrito anónimo (session_id) con el carrito del usuario autenticado.
+    - Suma cantidades por producto.
+    - Recalcula total_price según precio actual.
+    - Borra el carrito anónimo.
+    """
+    if user.get("role") != ROLE_CLIENTE:
+        raise HTTPException(
+            status_code=403, detail="Solo clientes pueden fusionar carritos"
+        )
+
+    if not payload.session_id:
+        raise HTTPException(status_code=400, detail="session_id requerido")
+
+    user_cart_id = await get_or_create_cart(conn, cliente_id=user["id"])
+    anon_cart = await conn.fetchrow(
+        "SELECT id FROM Carrito WHERE session_id = $1", payload.session_id
+    )
+    if not anon_cart:
+        return await get_cart_summary(conn, user_cart_id)
+
+    anon_cart_id = anon_cart["id"]
+    anon_items = await conn.fetch(
+        "SELECT producto_id, quantity FROM ArticuloCarrito WHERE carrito_id = $1",
+        anon_cart_id,
+    )
+
+    async with conn.transaction():
+        for it in anon_items:
+            producto_id = it["producto_id"]
+            qty_to_add = it["quantity"]
+
+            prod = await ensure_product_and_price(conn, producto_id)
+
+            # Ver si existe en el carrito del usuario
+            existing = await conn.fetchrow(
+                "SELECT quantity FROM ArticuloCarrito WHERE carrito_id = $1 AND producto_id = $2",
+                user_cart_id,
+                producto_id,
+            )
+            new_qty = qty_to_add + (existing["quantity"] if existing else 0)
+            new_qty = min(new_qty, prod["stock_quantity"])
+            total_price = float(prod["price"]) * new_qty
+
+            if existing:
+                await conn.execute(
+                    """
+                    UPDATE ArticuloCarrito
+                    SET quantity = $1, total_price = $2
+                    WHERE carrito_id = $3 AND producto_id = $4
+                    """,
+                    new_qty,
+                    total_price,
+                    user_cart_id,
+                    producto_id,
+                )
+            else:
+                await conn.execute(
+                    """
+                    INSERT INTO ArticuloCarrito (carrito_id, producto_id, quantity, total_price)
+                    VALUES ($1, $2, $3, $4)
+                    """,
+                    user_cart_id,
+                    producto_id,
+                    new_qty,
+                    total_price,
+                )
+
+        # Borrar carrito anónimo
+        await conn.execute(
+            "DELETE FROM ArticuloCarrito WHERE carrito_id = $1", anon_cart_id
+        )
+        await conn.execute("DELETE FROM Carrito WHERE id = $1", anon_cart_id)
+        await conn.execute(
+            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            user_cart_id,
+        )
+
+    return await get_cart_summary(conn, user_cart_id)
 
 
 # ENDPOINTS AUTH
@@ -1900,7 +2480,7 @@ async def eliminar_administrador(
         if current_admin["id"] == admin_id:
             raise HTTPException(
                 status_code=400,
-                detail="No puedes eliminar tu propia cuenta de administrador",
+                detail="No puedes eliminar tu propio usuario administrador",
             )
 
         exists = await conn.fetchrow(
@@ -1913,11 +2493,88 @@ async def eliminar_administrador(
         return MensajeResponse(
             mensaje=f"Administrador {admin_id} eliminado correctamente", exito=True
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error eliminando administrador {admin_id}: {e}")
         raise HTTPException(status_code=500, detail="Error al eliminar administrador")
+
+
+# ==================== TRANSBANK ====================
+
+
+@app.post("/api/transbank/create", response_model=TBKCreateResponse)
+async def tbk_create(
+    payload: TBKCreateRequest = Body(...),
+    request: Request = None,
+):
+    try:
+        if not payload.amount or int(payload.amount) <= 0:
+            raise HTTPException(status_code=400, detail="Monto inválido")
+
+        # Generar buy_order corto (<=26) y session_id (<=61)
+        def make_buy_order(pedido_id: Optional[int]) -> str:
+            base = (
+                f"O{pedido_id}" if pedido_id else f"O{int(datetime.now().timestamp())}"
+            )
+            rnd = secrets.token_hex(2).upper()
+            return f"{base}{rnd}"[:26]
+
+        buy_order = make_buy_order(payload.pedido_id)
+        session_id_tbk = (payload.session_id or "anon")[:61]
+        return_url = (payload.return_url or f"{FRONTEND_URL}/payment/return").strip()
+
+        tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
+        resp = tx.create(buy_order, session_id_tbk, int(payload.amount), return_url)
+
+        # Log útil ante errores
+        logger.info(f"TBK create resp: {resp}")
+
+        token = resp.get("token") or resp.get("token_ws")
+        url = (
+            resp.get("url")
+            or "https://webpay3g.transbank.cl/webpayserver/initTransaction"
+        )
+        if not token or not url:
+            raise HTTPException(
+                status_code=500, detail="Transbank no devolvió token o URL"
+            )
+
+        return {"token": token, "url": url}
+    except HTTPException:
+        raise
+    except RequestValidationError as e:
+        logger.error(f"Validación request /api/transbank/create: {e.errors()}")
+        raise
+    except Exception as e:
+        logger.error(f"Error creando transacción: {e}")
+        raise HTTPException(status_code=500, detail="Error al crear la transacción")
+
+
+@app.post("/api/transbank/confirm")
+async def tbk_confirm(payload: TBKConfirmRequest = Body(...)):
+    try:
+        if not payload.token_ws:
+            raise HTTPException(status_code=400, detail="token_ws requerido")
+
+        tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
+        resp = tx.commit(payload.token_ws)
+        status = resp.get("status")
+        if status == "AUTHORIZED":
+            return {
+                "status": "success",
+                "buy_order": resp.get("buy_order"),
+                "amount": resp.get("amount"),
+                "authorization_code": resp.get("authorization_code"),
+                "payment_type_code": resp.get("payment_type_code"),
+                "response_code": resp.get("response_code"),
+                "installments_number": resp.get("installments_number"),
+            }
+        else:
+            return {"status": "rejected", "detail": resp}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirmando transacción: {e}")
+        raise HTTPException(status_code=500, detail="Error al confirmar la transacción")
 
 
 @app.get("/")
@@ -1958,12 +2615,47 @@ async def root():
             "obtener_administrador": "GET /api/administradores/{id} (admin)",
             "actualizar_administrador": "PUT /api/administradores/{id} (admin)",
             "eliminar_administrador": "DELETE /api/administradores/{id} (admin)",
-            "categorias": "GET /api/categorias/",
-            "categorias_con_id": "GET /api/categorias-con-id/",
+            "transbank_create": "POST /api/transbank/create (cliente - requiere pedido_id)",
+            "transbank_confirm": "GET/POST /api/transbank/confirm (callback de Transbank)",
+            "transbank_status": "GET /api/transbank/status/{token} (cliente o admin)",
+            "transbank_refund": "POST /api/transbank/refund/{payment_id} (admin)",
+            "transbank_payments": "GET /api/transbank/payments (lista de pagos)",
+            "transbank_payment_detail": "GET /api/transbank/payments/{payment_id} (detalle de pago)",
             "health": "GET /health",
             "documentacion": "/docs",
         },
     }
+
+
+# Configuración Transbank (FORZAR TEST)
+TBK_ENV = (os.getenv("TBK_ENV") or "TEST").upper()
+TBK_INTEGRATION_TYPE = IntegrationType.TEST  # forzar test
+
+# Usa constantes oficiales de integración para evitar 401
+TBK_COMMERCE_CODE = (
+    os.getenv("TBK_COMMERCE_CODE") or IntegrationCommerceCodes.WEBPAY_PLUS
+)
+TBK_API_KEY = os.getenv("TBK_API_KEY") or IntegrationApiKeys.WEBPAY
+
+if WebpayOptions:
+    TBK_OPTIONS = WebpayOptions(
+        commerce_code=TBK_COMMERCE_CODE,
+        api_key=TBK_API_KEY,
+        integration_type=TBK_INTEGRATION_TYPE,
+    )
+else:
+    TBK_OPTIONS = None
+    Transaction.commerce_code = TBK_COMMERCE_CODE
+    Transaction.api_key = TBK_API_KEY
+    Transaction.integration_type = TBK_INTEGRATION_TYPE
+
+logger.info(
+    f"Transbank TEST configured. code={TBK_COMMERCE_CODE} type={TBK_INTEGRATION_TYPE}"
+)
+
+
+# Almacenamiento temporal de transacciones
+pending_transactions = {}
 
 
 # Lifecycle

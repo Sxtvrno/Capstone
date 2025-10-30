@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import TemplateNavbar from "./TemplateNavbar";
+import { CartContext } from "../contexts/CartContext";
 import { productAPI } from "../services/api";
 
 export default function StoreTemplateA({
@@ -12,6 +12,7 @@ export default function StoreTemplateA({
   headerColor = "#111827",
 }) {
   const navigate = useNavigate();
+  const { addToCart } = useContext(CartContext);
   const logoProp = logo || icon || logoSrc;
   const [imagesMap, setImagesMap] = useState({});
   const [sortOrder, setSortOrder] = useState("nuevo");
@@ -82,9 +83,26 @@ export default function StoreTemplateA({
     navigate(`/product/${productId}`);
   };
 
-  const handleAddToCart = (e, productName) => {
-    e.stopPropagation();
-    showToast(`${productName} agregado al carrito`);
+  // Acepta producto o nombre (compatibilidad con llamadas anteriores)
+  const handleAddToCart = (e, productOrName) => {
+    e?.stopPropagation?.();
+    let product = productOrName;
+    if (typeof productOrName === "string") {
+      product =
+        products.find(
+          (p) =>
+            p.nombre === productOrName ||
+            p.name === productOrName ||
+            p.title === productOrName
+        ) || null;
+    }
+    if (!product) {
+      showToast("No se pudo agregar al carrito");
+      return;
+    }
+    addToCart(product, 1);
+    const name = product.nombre || product.name || product.title || "Producto";
+    showToast(`"${name}" agregado al carrito`);
   };
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -103,12 +121,6 @@ export default function StoreTemplateA({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TemplateNavbar
-        storeName={storeName}
-        logo={logoProp}
-        headerColor={headerColor}
-      />
-
       {/* Toast Notification */}
       {toast.show && (
         <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
@@ -238,7 +250,7 @@ export default function StoreTemplateA({
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition"
-                      onClick={(e) => handleAddToCart(e, title)}
+                      onClick={(e) => handleAddToCart(e, p)}
                     >
                       Agregar
                       <svg
