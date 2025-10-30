@@ -436,7 +436,7 @@ export const emailAPI = {
   },
 };
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8001";
+const BASE_URL = import.meta.env.VITE_BACK_URL || "http://localhost:8001";
 
 function getAuthHeaders() {
   const token =
