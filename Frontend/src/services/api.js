@@ -199,12 +199,24 @@ export const productAPI = {
     return response.data;
   },
 
-  async update(id, productData) {
-    const response = await axios.put(
-      `${API_URL}/api/productos/${id}`,
-      productData
-    );
-    return response.data;
+  async update(idOrData, maybeData) {
+    // Soporta (id, data) o (dataConId)
+    const id =
+      typeof idOrData === "number" || typeof idOrData === "string"
+        ? idOrData
+        : idOrData?.id ?? maybeData?.id;
+
+    const data =
+      maybeData ?? (typeof idOrData === "object" ? { ...idOrData } : undefined);
+
+    if (!id) throw new Error("ID de producto inválido");
+    if (!data) throw new Error("Datos de producto inválidos");
+
+    const url = `${API_URL}/api/productos/${id}`;
+    const res = await axios.put(url, data, {
+      headers: { "Content-Type": "application/json" },
+    });
+    return res.data;
   },
 
   async delete(id) {
