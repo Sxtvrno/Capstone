@@ -75,7 +75,7 @@ git push origin develop
 ### 1. Navegar a la carpeta del backend
 
 ```bash
-cd Back
+cd Backend
 ```
 
 ### 2. Verificar el estado actual de EB
@@ -111,7 +111,7 @@ eb logs
 ### 1. Navegar a la carpeta del frontend
 
 ```bash
-cd ../Front
+cd ../Frontend
 ```
 
 ### 2. Instalar dependencias (si hay nuevas)
