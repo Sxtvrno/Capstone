@@ -67,11 +67,9 @@ const MediaManager = ({ onUpload }) => {
 
     setUploading(true);
     try {
-      // Crear FormData con la URL de la imagen
-      const formData = new FormData();
-      formData.append("url_imagen", url);
-
-      await productAPI.addImages(id, formData);
+      // Enviar array JSON como requiere el backend
+      const payload = [{ url_imagen: url.trim() }];
+      await productAPI.addImages(id, payload);
 
       alert("Imagen subida correctamente");
       setUrlInput({ ...urlInput, [id]: "" });
