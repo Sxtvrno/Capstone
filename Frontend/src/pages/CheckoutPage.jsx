@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
-import { transbankAPI } from "../services/api";
-import { authAPI } from "../services/api"; // si ya existe
+import { transbankAPI, authAPI } from "../services/api";
 
 function ensureSessionId() {
   let sid = localStorage.getItem("cart.sessionId");
@@ -14,7 +13,6 @@ function ensureSessionId() {
 }
 
 function postToWebpay(url, token) {
-  // Crear formulario y enviarlo vía POST con token_ws
   const form = document.createElement("form");
   form.method = "POST";
   form.action = url;
@@ -79,114 +77,240 @@ export default function CheckoutPage() {
 
   if (!items || items.length === 0) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-12">
-        <h1 className="text-2xl font-bold mb-4">Tu carrito está vacío</h1>
-        <button
-          onClick={() => navigate("/")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Ir a la tienda
-        </button>
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+          <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 3h2l.4 2M7 13h10l3-8H6.4M7 13l-2 7h12m0 0a2 2 0 100 4 2 2 0 000-4m-12 0a2 2 0 100 4 2 2 0 000-4"
+              />
+            </svg>
+          </div>
+          <h1 className="mb-2 text-2xl font-semibold text-gray-900">
+            Tu carrito está vacío
+          </h1>
+          <p className="mb-6 text-gray-600">
+            Explora nuestros productos y agrega tus favoritos.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 text-white shadow hover:bg-blue-700"
+          >
+            Ir a la tienda
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Carrito de compras</h1>
-        <button
-          onClick={clearCart}
-          className="text-red-600 hover:text-red-700 text-sm"
-        >
-          Vaciar carrito
-        </button>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-10">
+      <h1 className="mb-6 text-3xl font-bold tracking-tight text-gray-900">
+        Carrito de compras
+      </h1>
 
       {error && (
-        <div className="mb-4 p-3 rounded bg-red-50 text-red-700">{error}</div>
+        <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-red-700">
+          <div className="flex">
+            <svg
+              className="mr-2 h-5 w-5 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>{error}</span>
+          </div>
+        </div>
       )}
 
-      <div className="bg-white shadow rounded-lg divide-y">
-        {items.map((it) => (
-          <div key={it.id} className="p-4 flex items-center gap-4">
-            <img
-              src={it.image || "/no-image.png"}
-              alt={it.name}
-              className="w-16 h-16 object-cover rounded"
-              onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-            />
-            <div className="flex-1">
-              <h3 className="font-medium">{it.name}</h3>
-              <p className="text-sm text-gray-500">
-                ${(it.price ?? 0).toFixed(2)} c/u
-              </p>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Columna izquierda: Items */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              Tienes {totalItems} artículo(s) en tu carrito
+            </p>
+            <button
+              onClick={clearCart}
+              className="text-sm font-medium text-red-600 hover:text-red-700"
+            >
+              Vaciar carrito
+            </button>
+          </div>
+
+          <ul className="space-y-4">
+            {items.map((it) => (
+              <li
+                key={it.id}
+                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border">
+                    <img
+                      src={it.image || "/no-image.png"}
+                      alt={it.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) =>
+                        (e.currentTarget.style.visibility = "hidden")
+                      }
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-base font-medium text-gray-900">
+                          {it.name}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          ${(it.price ?? 0).toFixed(2)} c/u
+                        </p>
+                      </div>
+                      <div className="text-right text-base font-semibold text-gray-900">
+                        ${(it.price * (it.quantity ?? 1)).toFixed(2)}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="inline-flex items-center rounded-lg border border-gray-200">
+                        <button
+                          onClick={() =>
+                            updateQuantity(
+                              it.id,
+                              Math.max(1, (it.quantity ?? 1) - 1)
+                            )
+                          }
+                          className="h-9 w-9 rounded-l-lg text-gray-700 hover:bg-gray-50"
+                          aria-label="Disminuir"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          className="h-9 w-14 border-x border-gray-200 text-center text-sm outline-none"
+                          value={it.quantity ?? 1}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value || "1", 10);
+                            updateQuantity(
+                              it.id,
+                              isNaN(val) ? 1 : Math.max(1, val)
+                            );
+                          }}
+                        />
+                        <button
+                          onClick={() =>
+                            updateQuantity(it.id, (it.quantity ?? 1) + 1)
+                          }
+                          className="h-9 w-9 rounded-r-lg text-gray-700 hover:bg-gray-50"
+                          aria-label="Aumentar"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => removeFromCart(it.id)}
+                        className="text-sm font-medium text-red-600 hover:text-red-700"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Columna derecha: Resumen */}
+        <aside className="space-y-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              Resumen de la orden
+            </h2>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-medium text-gray-900">
+                  ${subtotal.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Envío</span>
+                <span className="text-gray-500">Se calcula en el pago</span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() =>
-                  updateQuantity(it.id, Math.max(1, (it.quantity ?? 1) - 1))
-                }
-                className="w-8 h-8 rounded bg-gray-100 hover:bg-gray-200"
-                aria-label="Disminuir"
-              >
-                -
-              </button>
-              <input
-                type="number"
-                min={1}
-                className="w-14 text-center border rounded p-1"
-                value={it.quantity ?? 1}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value || "1", 10);
-                  updateQuantity(it.id, isNaN(val) ? 1 : Math.max(1, val));
-                }}
-              />
-              <button
-                onClick={() => updateQuantity(it.id, (it.quantity ?? 1) + 1)}
-                className="w-8 h-8 rounded bg-gray-100 hover:bg-gray-200"
-                aria-label="Aumentar"
-              >
-                +
-              </button>
-            </div>
-
-            <div className="w-24 text-right font-medium">
-              ${(it.price * (it.quantity ?? 1)).toFixed(2)}
+            <div className="mt-4 border-t pt-4">
+              <div className="flex items-center justify-between text-base">
+                <span className="font-semibold text-gray-900">Total</span>
+                <span className="font-bold text-gray-900">
+                  ${subtotal.toFixed(2)}
+                </span>
+              </div>
             </div>
 
             <button
-              onClick={() => removeFromCart(it.id)}
-              className="ml-2 text-sm text-red-600 hover:text-red-700"
+              onClick={handlePay}
+              disabled={loadingPay}
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Quitar
+              {loadingPay ? (
+                <>
+                  <svg
+                    className="h-5 w-5 animate-spin text-white"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4A4 4 0 004 12z"
+                    ></path>
+                  </svg>
+                  Redirigiendo a Webpay...
+                </>
+              ) : (
+                "Proceder al pago"
+              )}
+            </button>
+
+            <button
+              onClick={() => navigate("/")}
+              className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-gray-700 hover:bg-gray-50"
+            >
+              Seguir comprando
             </button>
           </div>
-        ))}
-      </div>
 
-      <div className="mt-6 flex items-center justify-between">
-        <div className="text-gray-600">Artículos: {totalItems}</div>
-        <div className="text-xl">
-          Subtotal: <span className="font-bold">${subtotal.toFixed(2)}</span>
-        </div>
-      </div>
-
-      <div className="mt-6 flex gap-3">
-        <button
-          onClick={() => navigate("/")}
-          className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-        >
-          Seguir comprando
-        </button>
-        <button
-          onClick={handlePay}
-          disabled={loadingPay}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60"
-        >
-          {loadingPay ? "Redirigiendo a Webpay..." : "Proceder al pago"}
-        </button>
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+            Pagos seguros con Webpay Plus (ambiente de prueba).
+          </div>
+        </aside>
       </div>
     </div>
   );

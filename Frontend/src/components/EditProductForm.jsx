@@ -1,9 +1,8 @@
 // src/components/EditProductForm.jsx
 import React, { useState, useEffect } from "react";
-import { categoryAPI, productAPI } from "../services/api";
+import { categoryAPI } from "../services/api";
 
 export default function EditProductForm({ product, onSave, onCancel }) {
-  // Validación inicial
   if (!product) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -44,39 +43,73 @@ export default function EditProductForm({ product, onSave, onCancel }) {
     description: product?.description || "",
     price: product?.price || 0,
     stock_quantity: product?.stock_quantity || 0,
-    category_id: product?.category_id || "",
-    is_active: product?.is_active !== undefined ? product.is_active : true,
+    // usar category_id como number (o "")
+    category_id:
+      typeof product?.category_id === "number"
+        ? product.category_id
+        : typeof product?.categoria_id === "number"
+        ? product.categoria_id
+        : typeof product?.category?.id === "number"
+        ? product.category.id
+        : "",
   });
 
   const [categories, setCategories] = useState([]);
-  const [images, setImages] = useState([]);
-  const [newImages, setNewImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingImages, setLoadingImages] = useState(true);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchCategories();
-    if (product?.id) {
-      fetchImages();
-    }
   }, [product?.id]);
+
+  // Si cambia el producto (o llega luego), sincroniza el form
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      sku: product?.sku || "",
+      title: product?.title || "",
+      description: product?.description || "",
+      price: product?.price || 0,
+      stock_quantity: product?.stock_quantity || 0,
+      category_id:
+        typeof product?.category_id === "number"
+          ? product.category_id
+          : typeof product?.categoria_id === "number"
+          ? product.categoria_id
+          : typeof product?.category?.id === "number"
+          ? product.category.id
+          : "",
+    }));
+  }, [product]);
 
   const fetchCategories = async () => {
     setLoadingCategories(true);
     try {
-      const data = await categoryAPI.getAll();
-
-      // La API devuelve un array de strings con los nombres de las categorías
-      const normalizedCategories = Array.isArray(data)
-        ? data.map((categoryName) => ({
-            id: categoryName, // Usar el nombre como ID también
-            name: categoryName,
-          }))
+      // Preferir endpoint con id
+      let data = await categoryAPI.getAllWithId();
+      // Fallback si el backend devuelve otro formato
+      const normalized = Array.isArray(data)
+        ? data.map((c) => {
+            if (typeof c === "object") {
+              return {
+                id: Number(c.id),
+                name: String(c.name || c.nombre || c.title),
+              };
+            }
+            return { id: NaN, name: String(c) };
+          })
         : [];
-
-      setCategories(normalizedCategories);
+      setCategories(normalized.filter((c) => Number.isFinite(c.id)));
+      if (!normalized.length) {
+        // fallback a getAll (solo nombres) si fuese necesario
+        const names = await categoryAPI.getAll().catch(() => []);
+        setCategories(
+          Array.isArray(names)
+            ? names.map((n, i) => ({ id: i + 1, name: String(n) }))
+            : []
+        );
+      }
     } catch (err) {
       console.error("Error cargando categorías:", err);
       setCategories([]);
@@ -85,127 +118,86 @@ export default function EditProductForm({ product, onSave, onCancel }) {
     }
   };
 
-  const fetchImages = async () => {
-    setLoadingImages(true);
-    try {
-      const imgs = await productAPI.getImages(product.id);
-      setImages(Array.isArray(imgs) ? imgs : []);
-    } catch (err) {
-      console.error("Error cargando imágenes:", err);
-      setImages([]);
-    } finally {
-      setLoadingImages(false);
-    }
-  };
-
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]:
+        name === "category_id"
+          ? value === ""
+            ? ""
+            : Number(value)
+          : name === "price"
+          ? value
+          : name === "stock_quantity"
+          ? value
+          : value,
     }));
-
-    // Limpiar error del campo
     if (errors[name]) {
       setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
+        const n = { ...prev };
+        delete n[name];
+        return n;
       });
-    }
-  };
-
-  const handleImageSelect = (e) => {
-    const files = Array.from(e.target.files);
-    setNewImages((prev) => [...prev, ...files]);
-  };
-
-  const handleRemoveNewImage = (index) => {
-    setNewImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDeleteExistingImage = async (imageId) => {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar esta imagen?")) {
-      return;
-    }
-
-    try {
-      await productAPI.deleteImage(imageId);
-      setImages((prev) => prev.filter((img) => img.id !== imageId));
-      alert("Imagen eliminada exitosamente");
-    } catch (err) {
-      alert("Error al eliminar la imagen: " + err.message);
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-
-    if (!formData.sku?.trim()) {
-      newErrors.sku = "El SKU es requerido";
-    }
-
-    if (!formData.title?.trim()) {
-      newErrors.title = "El título es requerido";
-    }
-
-    if (!formData.price || formData.price <= 0) {
+    if (!formData.sku?.trim()) newErrors.sku = "El SKU es requerido";
+    if (!formData.title?.trim()) newErrors.title = "El título es requerido";
+    if (formData.price === "" || Number(formData.price) <= 0)
       newErrors.price = "El precio debe ser mayor a 0";
-    }
-
-    if (formData.stock_quantity < 0) {
+    if (formData.stock_quantity === "" || Number(formData.stock_quantity) < 0)
       newErrors.stock_quantity = "El stock no puede ser negativo";
-    }
-
-    if (!formData.category_id) {
+    if (
+      formData.category_id === "" ||
+      !Number.isFinite(Number(formData.category_id))
+    )
       newErrors.category_id = "Debes seleccionar una categoría";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Id seguro del producto
+  const productId =
+    Number(
+      product?.id ?? product?.producto_id ?? product?.productId ?? product?.ID
+    ) || null;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
 
-    if (!validateForm()) {
+    if (!productId) {
+      alert("No se pudo determinar el ID del producto");
       return;
     }
 
     setLoading(true);
-
     try {
-      // 1. Actualizar datos del producto
-      const updatedProduct = {
-        ...product,
-        ...formData,
-        price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity),
+      const payload = {
+        sku: formData.sku.trim(),
+        title: formData.title.trim(),
+        description: formData.description ?? "",
+        price: Number(formData.price),
+        stock_quantity: parseInt(formData.stock_quantity, 10),
+        category_id: Number(formData.category_id),
       };
 
-      await onSave(updatedProduct);
-
-      // 2. Subir nuevas imágenes si existen
-      if (newImages.length > 0) {
-        const formDataImages = new FormData();
-        newImages.forEach((file) => {
-          formDataImages.append("images", file);
-        });
-
-        try {
-          await productAPI.addImages(product.id, formDataImages);
-        } catch (err) {
-          console.error("Error al subir imágenes:", err);
-          alert(
-            "Producto actualizado pero hubo un error al subir las imágenes"
-          );
+      // Soportar ambas firmas de onSave
+      if (typeof onSave === "function") {
+        if (onSave.length >= 2) {
+          await onSave(productId, payload);
+        } else {
+          await onSave({ id: productId, ...payload });
         }
       }
-
-      // Limpiar formulario
-      setNewImages([]);
     } catch (err) {
-      alert("Error al actualizar el producto: " + err.message);
+      alert(
+        "Error al actualizar el producto: " + (err?.message || String(err))
+      );
     } finally {
       setLoading(false);
     }
@@ -351,6 +343,7 @@ export default function EditProductForm({ product, onSave, onCancel }) {
             )}
           </div>
 
+          {/* Categoría (usa category_id) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Categoría <span className="text-red-500">*</span>
@@ -382,123 +375,6 @@ export default function EditProductForm({ product, onSave, onCancel }) {
               <p className="text-red-500 text-sm mt-1">{errors.category_id}</p>
             )}
           </div>
-        </div>
-
-        {/* Estado activo */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            name="is_active"
-            id="is_active"
-            checked={formData.is_active}
-            onChange={handleChange}
-            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label
-            htmlFor="is_active"
-            className="ml-2 text-sm font-medium text-gray-700"
-          >
-            Producto activo
-          </label>
-        </div>
-
-        {/* Imágenes existentes */}
-        {loadingImages ? (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2 text-sm">Cargando imágenes...</p>
-          </div>
-        ) : (
-          images.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Imágenes actuales ({images.length})
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {images.map((img) => (
-                  <div key={img.id} className="relative group">
-                    <img
-                      src={img.url_imagen || img.url}
-                      alt="Producto"
-                      className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        e.target.src =
-                          "https://via.placeholder.com/150?text=Error";
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteExistingImage(img.id)}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        )}
-
-        {/* Nuevas imágenes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Agregar nuevas imágenes
-          </label>
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-          {newImages.length > 0 && (
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-              {newImages.map((file, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={`Preview ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveNewImage(index)}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                  <p className="text-xs text-gray-500 mt-1 truncate">
-                    {file.name}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Botones */}
