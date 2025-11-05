@@ -500,6 +500,73 @@ export const transbankAPI = {
   },
 };
 
+// API de Tickets de Soporte
+export const ticketsAPI = {
+  // Obtener todos los tickets (con filtro opcional de estado)
+  async getAll(estado = null) {
+    try {
+      const params = estado ? { estado } : {};
+      const response = await axios.get(`${API_URL}/api/admin/tickets`, {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error al obtener tickets:", error);
+      throw error;
+    }
+  },
+
+  // Obtener un ticket por ID
+  async getById(id) {
+    try {
+      const response = await axios.get(`${API_URL}/api/admin/tickets/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error al obtener ticket ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Actualizar estado de un ticket
+  async updateEstado(id, estado) {
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/admin/tickets/${id}/estado`,
+        { estado }
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error al actualizar estado del ticket ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Agregar notas internas a un ticket
+  async addNotas(id, notas) {
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/admin/tickets/${id}/notas`,
+        { notas }
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error al agregar notas al ticket ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Eliminar un ticket (opcional, puede ser útil para cleanup)
+  async delete(id) {
+    try {
+      const response = await axios.delete(`${API_URL}/api/admin/tickets/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error al eliminar ticket ${id}:`, error);
+      throw error;
+    }
+  },
+};
+
 // Exportar funciones legacy para compatibilidad (deprecadas)
 export const login = authAPI.login;
 export const register = authAPI.register;
@@ -542,5 +609,6 @@ export default {
   healthAPI,
   emailAPI,
   transbankAPI,
+  ticketsAPI,
   API_URL,
 };

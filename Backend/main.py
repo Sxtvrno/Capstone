@@ -93,9 +93,10 @@ class EmailService:
             return False
 
     async def send_verification_email(self, email: str, token: str):
-        verification_url = (
-            os.getenv("URL_BACKEND") or "http://localhost:8001"
-        ) + f"/api/auth/verify-email?token={token}"
+        # Usar FRONTEND_URL para que el link apunte al frontend
+        frontend_url = os.getenv("FRONTEND_URL") or "http://localhost:5173"
+        verification_url = f"{frontend_url}/verify-email?token={token}"
+        
         subject = "Verifica tu correo electrónico"
         html_body = f"""
         <html><body>
@@ -113,9 +114,8 @@ class EmailService:
         return await self.send_email(email, subject, html_body)
 
     async def send_password_reset_email(self, email: str, token: str):
-        reset_url = (
-            os.getenv("URL_BACK") or "http://localhost:8001"
-        ) + f"/api/auth/reset-password?token={token}"
+        frontend_url = os.getenv("FRONTEND_URL") or "http://localhost:5173"
+        reset_url = f"{frontend_url}/reset-password?token={token}"
         subject = "Restablecer contraseña"
         html_body = f"""
         <html><body>
@@ -2658,6 +2658,568 @@ logger.info(
 
 # Almacenamiento temporal de transacciones
 pending_transactions = {}
+
+
+# ==================== ENDPOINTS CHATBOT ====================
+
+# Schemas para Chatbot
+class ChatbotMessageRequest(BaseModel):
+    message: str
+    sender_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ChatbotMessageResponse(BaseModel):
+    response: str
+    confidence: Optional[float] = None
+    intent: Optional[str] = None
+
+
+class FAQCreate(BaseModel):
+    categoria: str
+    pregunta: str
+    respuesta: str
+    keywords: Optional[List[str]] = None
+    is_active: Optional[bool] = True
+
+
+class FAQUpdate(BaseModel):
+    categoria: Optional[str] = None
+    pregunta: Optional[str] = None
+    respuesta: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class FAQResponse(BaseModel):
+    id: int
+    categoria: str
+    pregunta: str
+    respuesta: str
+    keywords: Optional[List[str]]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class TicketResponse(BaseModel):
+    id: int
+    usuario_id: Optional[int]
+    conversacion: Optional[str]
+    estado: str
+    fecha_creacion: datetime
+    fecha_resolucion: Optional[datetime]
+    notas: Optional[str]
+    
+    # Campo opcional para el email del usuario (join con Cliente)
+    usuario_email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TicketUpdateEstadoRequest(BaseModel):
+    estado: str
+
+
+class TicketUpdateNotasRequest(BaseModel):
+    notas: str
+
+
+# Endpoint: Enviar mensaje al chatbot (proxy a Rasa)
+@app.post("/api/chatbot/message", response_model=List[ChatbotMessageResponse])
+async def chatbot_message(
+    request: ChatbotMessageRequest,
+    db=Depends(get_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """
+    Envía un mensaje al chatbot Rasa y devuelve la respuesta.
+    """
+    import httpx
+    
+    sender_id = request.sender_id or str(datetime.now().timestamp())
+    rasa_url = os.getenv("RASA_URL", "http://localhost:5005/webhooks/rest/webhook")
+
+    # Construir metadata incluyendo cliente_id si el usuario está autenticado
+    metadata = request.metadata.copy() if request.metadata else {}
+    if current_user and current_user.get("role") == ROLE_CLIENTE:
+        metadata["cliente_id"] = current_user.get("id") or current_user.get("user_id")
+
+    payload = {
+        "sender": sender_id,
+        "message": request.message,
+        "metadata": metadata,
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(rasa_url, json=payload, timeout=10.0)
+            
+            if response.status_code == 200:
+                rasa_responses = response.json()
+                
+                # Formatear respuestas
+                chatbot_responses = []
+                for resp in rasa_responses:
+                    chatbot_responses.append(
+                        ChatbotMessageResponse(
+                            response=resp.get("text", ""),
+                            confidence=resp.get("confidence"),
+                            intent=resp.get("intent")
+                        )
+                    )
+                
+                return chatbot_responses
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Error comunicándose con Rasa"
+                )
+    
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Timeout al conectar con el chatbot. Verifica que Rasa esté corriendo."
+        )
+    except Exception as e:
+        logger.error(f"Error en chatbot_message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Endpoint: Listar FAQs (Admin)
+@app.get("/api/admin/faqs", response_model=List[FAQResponse])
+async def list_faqs(
+    categoria: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Lista todas las FAQs. Solo para administradores.
+    """
+    # Verificar rol de administrador
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden acceder"
+        )
+    
+    try:
+        query = "SELECT * FROM FAQ WHERE 1=1"
+        params = []
+        param_count = 1
+        
+        if categoria:
+            query += f" AND categoria = ${param_count}"
+            params.append(categoria)
+            param_count += 1
+        
+        if is_active is not None:
+            query += f" AND is_active = ${param_count}"
+            params.append(is_active)
+            param_count += 1
+        
+        query += " ORDER BY categoria, id"
+        
+        faqs = await db.fetch(query, *params)
+        return [dict(faq) for faq in faqs]
+    
+    except Exception as e:
+        logger.error(f"Error listando FAQs: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo FAQs")
+
+
+# Endpoint: Crear FAQ (Admin)
+@app.post("/api/admin/faqs", response_model=FAQResponse)
+async def create_faq(
+    faq: FAQCreate,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Crea una nueva FAQ. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden crear FAQs"
+        )
+    
+    admin_id = token_data["user_id"]
+    
+    try:
+        query = """
+            INSERT INTO FAQ (categoria, pregunta, respuesta, keywords, is_active, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+        """
+        new_faq = await db.fetchrow(
+            query,
+            faq.categoria,
+            faq.pregunta,
+            faq.respuesta,
+            faq.keywords or [],
+            faq.is_active,
+            admin_id
+        )
+        
+        return dict(new_faq)
+    
+    except Exception as e:
+        logger.error(f"Error creando FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Error creando FAQ")
+
+
+# Endpoint: Actualizar FAQ (Admin)
+@app.put("/api/admin/faqs/{faq_id}", response_model=FAQResponse)
+async def update_faq(
+    faq_id: int,
+    faq: FAQUpdate,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Actualiza una FAQ existente. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden editar FAQs"
+        )
+    
+    try:
+        # Construir query dinámica
+        updates = []
+        params = []
+        param_count = 1
+        
+        if faq.categoria is not None:
+            updates.append(f"categoria = ${param_count}")
+            params.append(faq.categoria)
+            param_count += 1
+        
+        if faq.pregunta is not None:
+            updates.append(f"pregunta = ${param_count}")
+            params.append(faq.pregunta)
+            param_count += 1
+        
+        if faq.respuesta is not None:
+            updates.append(f"respuesta = ${param_count}")
+            params.append(faq.respuesta)
+            param_count += 1
+        
+        if faq.keywords is not None:
+            updates.append(f"keywords = ${param_count}")
+            params.append(faq.keywords)
+            param_count += 1
+        
+        if faq.is_active is not None:
+            updates.append(f"is_active = ${param_count}")
+            params.append(faq.is_active)
+            param_count += 1
+        
+        if not updates:
+            raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+        
+        updates.append(f"updated_at = CURRENT_TIMESTAMP")
+        params.append(faq_id)
+        
+        query = f"""
+            UPDATE FAQ
+            SET {', '.join(updates)}
+            WHERE id = ${param_count}
+            RETURNING *
+        """
+        
+        updated_faq = await db.fetchrow(query, *params)
+        
+        if not updated_faq:
+            raise HTTPException(status_code=404, detail="FAQ no encontrada")
+        
+        return dict(updated_faq)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando FAQ")
+
+
+# Endpoint: Eliminar FAQ (Admin)
+@app.delete("/api/admin/faqs/{faq_id}")
+async def delete_faq(
+    faq_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Elimina una FAQ. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden eliminar FAQs"
+        )
+    
+    try:
+        query = "DELETE FROM FAQ WHERE id = $1 RETURNING id"
+        deleted = await db.fetchval(query, faq_id)
+        
+        if not deleted:
+            raise HTTPException(status_code=404, detail="FAQ no encontrada")
+        
+        return {"mensaje": f"FAQ {faq_id} eliminada exitosamente"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error eliminando FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Error eliminando FAQ")
+
+
+# Endpoint: Listar tickets (Admin)
+@app.get("/api/admin/tickets", response_model=List[TicketResponse])
+async def list_tickets(
+    estado: Optional[str] = None,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Lista todos los tickets de soporte. Solo para administradores.
+    Opcionalmente filtra por estado (pendiente, en_proceso, resuelto, cerrado).
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden ver tickets"
+        )
+    
+    try:
+        # Query con LEFT JOIN para obtener email del usuario
+        query = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE 1=1
+        """
+        params = []
+        
+        if estado:
+            query += " AND t.estado = $1"
+            params.append(estado)
+        
+        query += " ORDER BY t.fecha_creacion DESC"
+        
+        tickets = await db.fetch(query, *params)
+        return [dict(ticket) for ticket in tickets]
+    
+    except Exception as e:
+        logger.error(f"Error listando tickets: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo tickets")
+
+
+# Endpoint: Obtener un ticket por ID (Admin)
+@app.get("/api/admin/tickets/{ticket_id}", response_model=TicketResponse)
+async def get_ticket(
+    ticket_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Obtiene los detalles de un ticket específico. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden ver tickets"
+        )
+    
+    try:
+        query = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE t.id = $1
+        """
+        
+        ticket = await db.fetchrow(query, ticket_id)
+        
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        
+        return dict(ticket)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo ticket: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo ticket")
+
+
+# Endpoint: Actualizar estado de ticket (Admin)
+@app.patch("/api/admin/tickets/{ticket_id}/estado", response_model=TicketResponse)
+async def update_ticket_status(
+    ticket_id: int,
+    request: TicketUpdateEstadoRequest,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Actualiza el estado de un ticket. Solo para administradores.
+    Estados válidos: pendiente, en_proceso, resuelto, cerrado
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden actualizar tickets"
+        )
+    
+    valid_estados = ["pendiente", "en_proceso", "resuelto", "cerrado"]
+    if request.estado not in valid_estados:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Estado inválido. Debe ser uno de: {', '.join(valid_estados)}"
+        )
+    
+    try:
+        # Si el estado es 'resuelto' o 'cerrado', actualizar fecha_resolucion
+        if request.estado in ["resuelto", "cerrado"]:
+            query = """
+                UPDATE tickets_soporte
+                SET estado = $1, fecha_resolucion = CURRENT_TIMESTAMP
+                WHERE id = $2
+                RETURNING *
+            """
+        else:
+            query = """
+                UPDATE tickets_soporte
+                SET estado = $1, fecha_resolucion = NULL
+                WHERE id = $2
+                RETURNING *
+            """
+        
+        updated_ticket = await db.fetchrow(query, request.estado, ticket_id)
+        
+        if not updated_ticket:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        
+        # Obtener email del usuario
+        query_with_email = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE t.id = $1
+        """
+        ticket_with_email = await db.fetchrow(query_with_email, ticket_id)
+        
+        return dict(ticket_with_email)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando ticket: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando ticket")
+
+
+# Endpoint: Agregar/actualizar notas internas de un ticket (Admin)
+@app.patch("/api/admin/tickets/{ticket_id}/notas", response_model=TicketResponse)
+async def update_ticket_notes(
+    ticket_id: int,
+    request: TicketUpdateNotasRequest,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Agrega o actualiza las notas internas de un ticket. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden actualizar notas"
+        )
+    
+    try:
+        query = """
+            UPDATE tickets_soporte
+            SET notas = $1
+            WHERE id = $2
+            RETURNING *
+        """
+        
+        updated_ticket = await db.fetchrow(query, request.notas, ticket_id)
+        
+        if not updated_ticket:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        
+        # Obtener email del usuario
+        query_with_email = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE t.id = $1
+        """
+        ticket_with_email = await db.fetchrow(query_with_email, ticket_id)
+        
+        return dict(ticket_with_email)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando notas: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando notas")
+
+
+# Endpoint: Eliminar un ticket (Admin) - opcional
+@app.delete("/api/admin/tickets/{ticket_id}")
+async def delete_ticket(
+    ticket_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Elimina un ticket. Solo para administradores. Usar con precaución.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden eliminar tickets"
+        )
+    
+    try:
+        query = "DELETE FROM tickets_soporte WHERE id = $1 RETURNING id"
+        deleted = await db.fetchrow(query, ticket_id)
+        
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        
+        return {"message": "Ticket eliminado correctamente", "id": deleted["id"]}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error eliminando ticket: {e}")
+        raise HTTPException(status_code=500, detail="Error eliminando ticket")
+
+
+# ==================== FIN ENDPOINTS TICKETS ====================
 
 
 # Lifecycle

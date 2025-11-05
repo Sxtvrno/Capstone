@@ -1,0 +1,6 @@
+# Endpoints para conectar Rasa con actions server y otros servicios
+
+action_endpoint:
+  url: "http://localhost:5055/webhook"
+# Canal de REST (para recibir mensajes desde tu backend FastAPI)
+# No necesitas configurar nada aquí, Rasa lo maneja automáticamente

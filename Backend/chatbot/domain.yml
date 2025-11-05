@@ -1,0 +1,98 @@
+version: "3.1"
+
+intents:
+  - greet
+  - goodbye
+  - affirm
+  - deny
+  - bot_challenge
+  - faq:
+      use_entities: []
+  - consultar_pedido
+  - hablar_humano
+  - agradecer
+  - ayuda
+
+entities:
+  - pedido_id
+  - categoria_faq
+
+slots:
+  pedido_id:
+    type: text
+    mappings:
+      - type: from_entity
+        entity: pedido_id
+
+  cliente_id:
+    type: text
+    mappings:
+      - type: custom
+
+  session_id:
+    type: text
+    mappings:
+      - type: custom
+
+  requested_slot:
+    type: text
+    mappings:
+      - type: custom
+
+responses:
+  utter_greet:
+    - text: "¡Hola! 👋 Soy el asistente virtual. ¿En qué puedo ayudarte hoy?"
+    - text: "¡Bienvenido/a! Estoy aquí para ayudarte con tus consultas."
+
+  utter_goodbye:
+    - text: "¡Hasta pronto! Si necesitas algo más, aquí estaré. 😊"
+    - text: "¡Que tengas un excelente día! Vuelve cuando quieras."
+
+  utter_ayuda:
+    - text: |
+        Puedo ayudarte con:
+
+        📦 **Envíos y entregas** - Tiempos, costos, seguimiento
+        💳 **Medios de pago** - Formas de pago aceptadas
+        🔄 **Cambios y devoluciones** - Política de cambios
+        📦 **Estado de pedido** - Consulta tu orden
+        👤 **Hablar con un humano** - Crear ticket de soporte
+
+        ¿Con qué te ayudo?
+
+  utter_bot_challenge:
+    - text: "Soy un bot asistente creado para ayudarte con tus consultas. 🤖"
+
+  utter_agradecer:
+    - text: "¡De nada! Siempre es un placer ayudar. 😊"
+    - text: "¡Para eso estoy! ¿Necesitas algo más?"
+
+  utter_iamabot:
+    - text: "Soy un asistente virtual automatizado."
+
+  utter_default:
+    - text: "Disculpa, no entendí bien tu pregunta. ¿Puedes reformularla?"
+    - text: "No estoy seguro de entender. ¿Podrías ser más específico?"
+
+  utter_pedir_pedido_id:
+    - text: "Por favor, indícame tu número de pedido (lo encuentras en tu email de confirmación)."
+
+  utter_pedido_no_encontrado:
+    - text: "No encontré un pedido con ese número. Verifica que esté correcto o contáctanos para más ayuda."
+
+  utter_escalar_ticket:
+    - text: "Entendido, voy a crear un ticket para que uno de nuestros agentes te contacte pronto."
+
+  utter_ticket_creado:
+    - text: "✅ Tu ticket ha sido creado exitosamente. Un agente te contactará dentro de las próximas 24 horas."
+
+actions:
+  - action_buscar_faq
+  - action_consultar_pedido
+  - action_crear_ticket
+  - action_guardar_conversacion
+  - action_default_fallback
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

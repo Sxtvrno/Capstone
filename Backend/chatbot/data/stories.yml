@@ -1,0 +1,76 @@
+version: "3.1"
+
+stories:
+  # Historia básica de saludo
+  - story: saludo simple
+    steps:
+      - intent: greet
+      - action: utter_greet
+
+  # Historia de consulta FAQ
+  - story: consulta faq y se despide
+    steps:
+      - intent: greet
+      - action: utter_greet
+      - intent: faq
+      - action: action_buscar_faq
+      - intent: agradecer
+      - action: utter_agradecer
+      - intent: goodbye
+      - action: utter_goodbye
+
+  # Historia de consulta de pedido exitosa
+  - story: consultar estado de pedido exitoso
+    steps:
+      - intent: consultar_pedido
+      - action: action_consultar_pedido
+      - intent: agradecer
+      - action: utter_agradecer
+
+  # Historia de consulta de pedido sin ID
+  - story: consultar pedido sin numero
+    steps:
+      - intent: consultar_pedido
+      - action: utter_pedir_pedido_id
+      - intent: consultar_pedido
+      - action: action_consultar_pedido
+
+  # Historia de escalamiento a humano
+  - story: escalar a agente humano
+    steps:
+      - intent: hablar_humano
+      - action: utter_escalar_ticket
+      - action: action_crear_ticket
+      - action: utter_ticket_creado
+
+  # Historia de ayuda general
+  - story: solicitar ayuda
+    steps:
+      - intent: ayuda
+      - action: utter_ayuda
+
+  # Historia: FAQ + más preguntas
+  - story: multiples faqs
+    steps:
+      - intent: faq
+      - action: action_buscar_faq
+      - intent: faq
+      - action: action_buscar_faq
+      - intent: agradecer
+      - action: utter_agradecer
+
+  # Historia: No entiende + escala
+  - story: usuario frustrado escala
+    steps:
+      - intent: faq
+      - action: action_buscar_faq
+      - intent: hablar_humano
+      - action: utter_escalar_ticket
+      - action: action_crear_ticket
+      - action: utter_ticket_creado
+
+  # Historia: Pregunta por bot
+  - story: pregunta si es bot
+    steps:
+      - intent: bot_challenge
+      - action: utter_bot_challenge

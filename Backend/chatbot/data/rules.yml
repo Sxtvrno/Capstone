@@ -1,0 +1,52 @@
+version: "3.1"
+
+rules:
+  # Regla: Siempre saludar al inicio
+  - rule: Saludo inicial
+    steps:
+      - intent: greet
+      - action: utter_greet
+
+  # Regla: Siempre despedirse
+  - rule: Despedida
+    steps:
+      - intent: goodbye
+      - action: utter_goodbye
+
+  # Regla: Responder a agradecimientos
+  - rule: Responder gracias
+    steps:
+      - intent: agradecer
+      - action: utter_agradecer
+
+  # Regla: Ayuda siempre muestra opciones
+  - rule: Mostrar ayuda
+    steps:
+      - intent: ayuda
+      - action: utter_ayuda
+
+  # Regla: Challenge bot
+  - rule: Responder a bot challenge
+    steps:
+      - intent: bot_challenge
+      - action: utter_bot_challenge
+
+  # Regla: Buscar FAQ
+  - rule: Responder FAQ
+    steps:
+      - intent: faq
+      - action: action_buscar_faq
+
+  # Regla: Escalar a humano
+  - rule: Crear ticket soporte
+    steps:
+      - intent: hablar_humano
+      - action: utter_escalar_ticket
+      - action: action_crear_ticket
+      - action: utter_ticket_creado
+
+  # Regla: Fallback cuando no entiende
+  - rule: Fallback bajo confianza
+    steps:
+      - intent: nlu_fallback
+      - action: action_default_fallback

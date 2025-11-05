@@ -56,3 +56,32 @@ local_settings.py
 # Elastic Beanstalk artifacts and logs
 Back/.elasticbeanstalk/app_versions/
 Back/.elasticbeanstalk/logs/
+
+# Database dumps and migrations
+*.sql
+db.sql
+insert.sql
+chatbot_migration.sql
+
+# Temporary files
+tmp/
+temp/
+
+# Development/Testing scripts (keep critical ones)
+Backend/scripts/create_test_tickets.py
+Backend/scripts/peek_*.py
+Backend/scripts/inspect_db_tables.py
+
+# Setup scripts (use documentation instead)
+setup_chatbot.ps1
+start_chatbot.ps1
+
+# Chatbot virtual environments
+Backend/chatbot/.rasa-venv/
+Backend/chatbot/.venv/
+.rasa-venv/
+
+# Rasa training artifacts (regenerated)
+Backend/chatbot/models/*.tar.gz
+Backend/chatbot/.rasa/
+**/chatbot/.rasa/cache/
