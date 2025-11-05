@@ -16,6 +16,7 @@ import RegisterPage from "./pages/RegisterPage";
 import VerificationPage from "./pages/VerificationPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ChatWidget from "./components/ChatWidget";
 import { authAPI } from "./services/api";
 import { CartProvider } from "./contexts/CartContext";
 import PaymentReturn from "./pages/PaymentReturn";
@@ -30,6 +31,8 @@ function PublicLayout({ storeName, logo, headerColor }) {
         className="w-full"
       />
       <Outlet />
+      {/* Chatbot disponible en todas las páginas públicas */}
+      <ChatWidget />
     </>
   );
 }

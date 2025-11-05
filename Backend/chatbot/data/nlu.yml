@@ -1,0 +1,181 @@
+version: "3.1"
+
+nlu:
+  # Saludos
+  - intent: greet
+    examples: |
+      - hola
+      - buenos días
+      - buenas tardes
+      - buenas noches
+      - hey
+      - holi
+      - qué tal
+      - saludos
+      - alo
+      - ola
+
+  # Despedidas
+  - intent: goodbye
+    examples: |
+      - adiós
+      - chao
+      - hasta luego
+      - nos vemos
+      - bye
+      - me voy
+      - gracias adiós
+      - hasta pronto
+      - me retiro
+
+  # Afirmaciones
+  - intent: affirm
+    examples: |
+      - sí
+      - si
+      - claro
+      - exacto
+      - correcto
+      - afirmativo
+      - por supuesto
+      - ok
+      - dale
+      - ya
+
+  # Negaciones
+  - intent: deny
+    examples: |
+      - no
+      - nop
+      - para nada
+      - negativo
+      - no gracias
+      - no quiero
+      - no me interesa
+
+  # Agradecimientos
+  - intent: agradecer
+    examples: |
+      - gracias
+      - muchas gracias
+      - te agradezco
+      - thanks
+      - genial gracias
+      - perfecto gracias
+      - ok gracias
+
+  # Ayuda general
+  - intent: ayuda
+    examples: |
+      - ayuda
+      - qué puedes hacer
+      - en qué me puedes ayudar
+      - qué servicios ofreces
+      - opciones
+      - menú
+      - comandos
+
+  # Challenge bot
+  - intent: bot_challenge
+    examples: |
+      - eres un bot?
+      - eres humano?
+      - eres real?
+      - habló con una máquina?
+      - quién eres?
+      - qué eres?
+
+  # Consultar pedido
+  - intent: consultar_pedido
+    examples: |
+      - dónde está mi pedido
+      - quiero rastrear mi pedido
+      - estado de mi orden
+      - mi pedido [12345](pedido_id)
+      - pedido número [456](pedido_id)
+      - orden [789](pedido_id)
+      - seguimiento del pedido
+      - tracking de mi compra
+      - cuándo llega mi pedido
+      - quiero saber sobre mi pedido [1001](pedido_id)
+      - información del pedido [2023](pedido_id)
+      - ver mi pedido
+      - consultar orden
+
+  # Escalar a humano
+  - intent: hablar_humano
+    examples: |
+      - quiero hablar con una persona
+      - necesito hablar con un humano
+      - dame un agente
+      - contactar con soporte
+      - hablar con alguien real
+      - comunicarme con un operador
+      - asistencia humana
+      - no me sirve tu respuesta
+      - no entiendes
+      - quiero ayuda de verdad
+
+  # FAQs sobre envíos
+  - intent: faq
+    examples: |
+      - cuánto cuesta el envío
+      - precio de envío
+      - costo del despacho
+      - cuánto cobran por envío
+      - envío gratis
+      - tienen envío gratuito
+      - cuánto demora el envío
+      - tiempos de entrega
+      - cuándo llega mi compra
+      - días de entrega
+      - puedo rastrear mi envío
+      - seguimiento de envío
+      - tracking
+      - número de seguimiento
+
+  # FAQs sobre pagos
+  - intent: faq
+    examples: |
+      - qué medios de pago aceptan
+      - formas de pago
+      - puedo pagar con tarjeta
+      - aceptan webpay
+      - transferencia bancaria
+      - mercado pago
+      - es seguro comprar
+      - seguridad del pago
+      - certificado ssl
+
+  # FAQs sobre cambios y devoluciones
+  - intent: faq
+    examples: |
+      - puedo devolver un producto
+      - política de devoluciones
+      - cambios de producto
+      - cómo cambio un producto
+      - plazo para devolver
+      - reembolso
+      - cuánto tarda el reembolso
+      - devolución de dinero
+      - garantía
+
+  # FAQs sobre productos
+  - intent: faq
+    examples: |
+      - tienen stock
+      - hay disponibilidad
+      - producto disponible
+      - está agotado
+      - puedo reservar
+      - apartar un producto
+
+  # FAQs sobre cuenta
+  - intent: faq
+    examples: |
+      - necesito crear cuenta
+      - registrarme
+      - olvidé mi contraseña
+      - recuperar password
+      - resetear contraseña
+      - cambiar contraseña

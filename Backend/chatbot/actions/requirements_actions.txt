@@ -1,0 +1,4 @@
+## Match Rasa 3.6.21 constraint: rasa-sdk>=3.6.2,<3.7.0
+rasa-sdk>=3.6.2,<3.7.0
+asyncpg==0.30.0
+python-dotenv==1.0.0

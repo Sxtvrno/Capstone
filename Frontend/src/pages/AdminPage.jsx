@@ -4,6 +4,7 @@ import ProductList from "../components/ProductList";
 import ProductForm from "../components/ProductForm";
 import MediaManager from "../components/MediaManager";
 import CustomizeStore from "../components/CustomizeStore";
+import TicketManager from "../components/TicketManager";
 import Sidebar from "../components/SideBar";
 import { authAPI } from "../services/api";
 
@@ -48,6 +49,7 @@ function AdminPage({ user, onLogout }) {
                   {vista === "productos" && "Gestión de Productos"}
                   {vista === "crear" && "Crear Nuevo Producto"}
                   {vista === "media" && "Gestión de Medios"}
+                  {vista === "tickets" && "Tickets de Soporte"}
                   {vista === "personaliza" && "Personalizar Tienda"}
                 </h1>
                 <p className="text-sm md:text-base text-gray-600">
@@ -56,6 +58,8 @@ function AdminPage({ user, onLogout }) {
                   {vista === "crear" && "Añade un nuevo producto a tu catálogo"}
                   {vista === "media" &&
                     "Gestiona las imágenes de tus productos"}
+                  {vista === "tickets" &&
+                    "Gestiona los tickets de soporte de tus clientes"}
                   {vista === "personaliza" &&
                     "Personaliza la apariencia de tu tienda"}
                 </p>
@@ -81,6 +85,7 @@ function AdminPage({ user, onLogout }) {
             {vista === "productos" && <ProductList />}
             {vista === "crear" && <ProductForm />}
             {vista === "media" && <MediaManager />}
+            {vista === "tickets" && <TicketManager />}
             {vista === "personaliza" && <CustomizeStore />}
           </div>
         </div>
