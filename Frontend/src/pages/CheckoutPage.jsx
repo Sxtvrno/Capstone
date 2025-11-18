@@ -146,7 +146,7 @@ export default function CheckoutPage() {
               Tienes {totalItems} artículo(s) en tu carrito
             </p>
             <button
-              onClick={clearCart}
+              onClick={() => clearCart()}
               className="text-sm font-medium text-red-600 hover:text-red-700"
             >
               Vaciar carrito
