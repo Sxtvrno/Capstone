@@ -21,7 +21,8 @@ export default function PaymentReturn() {
         const resp = await transbankAPI.confirmTransaction(tokenWs);
         if (resp?.status === "APPROVED" || resp?.status === "success") {
           // Vaciar carrito tras pago aprobado
-          clearCart();
+          const sessionId = localStorage.getItem("cart.sessionId") || undefined;
+          await clearCart(sessionId);
           setStatus("Pago aprobado. ¡Gracias por tu compra!");
           setTimeout(() => navigate("/"), 1500);
         } else if (resp?.status === "rejected") {

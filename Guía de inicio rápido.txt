@@ -1,0 +1,26 @@
+# Terminal 1 - Backend
+cd Backend
+python -m venv venv (Si no está creado)
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py
+
+# Terminal 2 - Frontend
+cd Frontend
+npm install
+npm run dev
+
+# Terminal 3 - Rasa Actions
+cd Backend\chatbot
+python -m venv .rasa_venv (Si no está creado)
+.\.rasa-venv\Scripts\Activate.ps1
+pip install -r .\actions\requirements_actions.txt
+rasa run actions --port 5055
+
+# Terminal 4 - Rasa Server
+cd Backend\chatbot
+python -m venv .rasa_venv (Si no está creado)
+.\.rasa-venv\Scripts\Activate.ps1
+pip install rasa==3.6.21 (Si no está instalado)
+rasa train (Si no hay modelo entrenado)
+rasa run --enable-api --cors "*" --port 5005
