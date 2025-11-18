@@ -76,6 +76,19 @@ export function CartProvider({ children }) {
   // Reemplaza/actualiza la función clearCart para aceptar sessionId
   async function clearCart(sessionId) {
     try {
+      // Protección: si se pasó un SyntheticEvent (por error en onClick), ignóralo
+      if (sessionId && typeof sessionId !== "string") {
+        if (sessionId?.nativeEvent || sessionId?.target) {
+          sessionId = undefined;
+        } else {
+          try {
+            sessionId = String(sessionId);
+          } catch {
+            sessionId = undefined;
+          }
+        }
+      }
+
       const API_BASE =
         import.meta.env.VITE_API_BASE ||
         `${window.location.protocol}//${window.location.hostname}:8000`;

@@ -513,12 +513,21 @@ export const transbankAPI = {
 
   async confirmTransaction(token_ws) {
     const headers = authHeaders();
-    // algunos endpoints usan GET, otros POST — aquí intento GET primero
-    console.info("[transbankAPI.confirmTransaction] url:", `${API_BASE}/api/transbank/confirm?token_ws=${token_ws}`);
-    const res = await fetch(`${API_BASE}/api/transbank/confirm?token_ws=${encodeURIComponent(token_ws)}`, {
-      method: "GET",
+    headers["Accept"] = "application/json";
+
+    console.info(
+      "[transbankAPI.confirmTransaction] url:",
+      `${API_BASE}/api/transbank/confirm`,
+      "body:",
+      { token_ws }
+    );
+
+    const res = await fetch(`${API_BASE}/api/transbank/confirm`, {
+      method: "POST",
       headers,
+      body: JSON.stringify({ token_ws }),
     });
+
     const text = await res.text();
     try {
       const data = text ? JSON.parse(text) : {};
