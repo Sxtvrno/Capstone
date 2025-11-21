@@ -20,6 +20,7 @@ import ChatWidget from "./components/ChatWidget";
 import { authAPI } from "./services/api";
 import { CartProvider } from "./contexts/CartContext";
 import PaymentReturn from "./pages/PaymentReturn";
+import OrdersPage from "./pages/OrdersPage";
 
 function PublicLayout({ storeName, logo, headerColor }) {
   return (
@@ -103,6 +104,7 @@ function App() {
               }
             />
             <Route path="/product/:id" element={<ProductDetailPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/verify-email" element={<VerificationPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
