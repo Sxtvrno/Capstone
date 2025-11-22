@@ -124,7 +124,7 @@ export function CartProvider({ children }) {
         };
         if (sessionId) body.session_id = sessionId;
         const res = await fetch(`${API_URL}/api/cart/items/${productId}`, {
-          method: "PATCH",
+          method: "PUT",
           headers,
           body: JSON.stringify(body),
         });
