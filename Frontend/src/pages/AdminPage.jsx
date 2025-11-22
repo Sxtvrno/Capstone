@@ -8,6 +8,7 @@ import TicketManager from "../components/TicketManager";
 import OrderManager from "../components/OrderManager";
 import Sidebar from "../components/SideBar";
 import { authAPI } from "../services/api";
+import OrdersAdmin from "../components/OrdersAdmin";
 
 function AdminPage({ user, onLogout }) {
   const [vista, setVista] = useState("productos");
@@ -53,6 +54,7 @@ function AdminPage({ user, onLogout }) {
                   {vista === "pedidos" && "Gestión de Pedidos"}
                   {vista === "tickets" && "Tickets de Soporte"}
                   {vista === "personaliza" && "Personalizar Tienda"}
+                  {vista === "pedidos" && "Gestión de Pedidos"}
                 </h1>
                 <p className="text-sm md:text-base text-gray-600">
                   {vista === "productos" &&
@@ -66,6 +68,8 @@ function AdminPage({ user, onLogout }) {
                     "Gestiona los tickets de soporte de tus clientes"}
                   {vista === "personaliza" &&
                     "Personaliza la apariencia de tu tienda"}
+                  {vista === "pedidos" &&
+                    "Revisa y administra todos los pedidos recibidos"}
                 </p>
               </div>
 
@@ -92,6 +96,7 @@ function AdminPage({ user, onLogout }) {
             {vista === "pedidos" && <OrderManager />}
             {vista === "tickets" && <TicketManager />}
             {vista === "personaliza" && <CustomizeStore />}
+            {vista === "pedidos" && <OrdersAdmin />}
           </div>
         </div>
       </main>
