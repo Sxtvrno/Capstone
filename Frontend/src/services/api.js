@@ -1,7 +1,11 @@
 import axios from "axios";
 
 // Configuración base
-export const API_URL = import.meta.env.VITE_BACK_URL || "http://localhost:8001";
+export const API_URL =
+  import.meta.env.VITE_BACK_URL ||
+  (window.location.hostname === "localhost"
+    ? "http://localhost:8001"
+    : "https://d10nrn1yj450xr.cloudfront.net");
 
 // Configurar interceptor para agregar token automáticamente
 axios.interceptors.request.use(
@@ -454,7 +458,11 @@ export const emailAPI = {
   },
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (window.location.hostname === "localhost"
+    ? "http://localhost:8001"
+    : "https://d10nrn1yj450xr.cloudfront.net");
 
 function getStoredToken() {
   return (
