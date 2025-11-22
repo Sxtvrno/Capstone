@@ -203,11 +203,11 @@ class ProductoCreate(BaseModel):
     category_id: int
 
 
-class ImagenProductoCreate(BaseModel):
+class ProductoImagenCreate(BaseModel):
     url_imagen: str
 
 
-class ImagenProductoResponse(BaseModel):
+class ProductoImagenResponse(BaseModel):
     id: int
     producto_id: int
     url_imagen: str
@@ -786,7 +786,7 @@ async def get_cart_summary(conn, cart_id: int) -> CartResponse:
         JOIN Producto p ON p.id = ac.producto_id
         LEFT JOIN LATERAL (
             SELECT url_imagen
-            FROM ImagenProducto
+            FROM productoimagen
             WHERE producto_id = p.id
             ORDER BY id ASC
             LIMIT 1
@@ -2039,11 +2039,11 @@ async def eliminar_producto(
 
 
 @app.post(
-    "/api/productos/{producto_id}/imagenes", response_model=List[ImagenProductoResponse]
+    "/api/productos/{producto_id}/imagenes", response_model=List[ProductoImagenResponse]
 )
 async def agregar_imagenes_producto(
     producto_id: int,
-    imagenes: List[ImagenProductoCreate],
+    imagenes: List[ProductoImagenCreate],
     conn=Depends(get_db),
     current_admin: dict = Depends(get_current_admin),
 ):
@@ -2064,7 +2064,7 @@ async def agregar_imagenes_producto(
 
 
 @app.get(
-    "/api/productos/{producto_id}/imagenes", response_model=List[ImagenProductoResponse]
+    "/api/productos/{producto_id}/imagenes", response_model=List[ProductoImagenResponse]
 )
 async def obtener_imagenes_producto(
     producto_id: int,
@@ -2162,7 +2162,7 @@ async def obtener_productos_publicos(
 
 @app.get(
     "/api/public/productos/{producto_id}/imagenes",
-    response_model=List[ImagenProductoResponse],
+    response_model=List[ProductoImagenResponse],
 )
 async def obtener_imagenes_producto_publicas(
     producto_id: int,
@@ -3039,6 +3039,23 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
             # eliminar meta temporal si existe
             pending_transactions.pop(payload.token_ws, None)
 
+            # Descontar stock de producto para todos los productos del pedido
+            detalles_pedido = await conn.fetch(
+                "SELECT producto_id, cantidad FROM detalle_pedido WHERE pedido_id = $1",
+                pedido_id,
+            )
+            for det in detalles_pedido:
+                await conn.execute(
+                    """
+                    UPDATE producto
+                    SET stock_quantity = stock_quantity - $1
+                    WHERE id = $2
+                    """,
+                    det["cantidad"],
+                    det["producto_id"],
+                )
+            logger.info(f"Stock descontado para pedido {pedido_id} tras confirmación de pago.")
+
             return {
                 "status": "success",
                 "pedido_id": pedido_id,
@@ -3201,7 +3218,17 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                                         qty,
                                         unit_price,
                                     )
-                                logger.info(f"[TBK_CONFIRM] detalle_pedido insertado para pedido {pedido_id}.")
+                                    # Descontar stock SOLO aquí, para no afectar otros flujos
+                                    await conn.execute(
+                                        """
+                                        UPDATE producto
+                                        SET stock_quantity = stock_quantity - $1
+                                        WHERE id = $2
+                                        """,
+                                        qty,
+                                        pid,
+                                    )
+                                logger.info(f"[TBK_CONFIRM] detalle_pedido insertado y stock actualizado para pedido {pedido_id}.")
 
             except Exception as e:
                 logger.error(f"Error en confirmación de pago: {e}")

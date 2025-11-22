@@ -195,7 +195,11 @@ export default function StoreTemplateA({
             const title = p.name || p.title || "Producto";
             const price =
               p.price != null && !Number.isNaN(Number(p.price))
-                ? Number(p.price).toFixed(0)
+                ? Number(p.price)
+                : null;
+            const formattedPrice =
+              price != null
+                ? price.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })
                 : null;
 
             return (
@@ -240,9 +244,9 @@ export default function StoreTemplateA({
                     </p>
                   )}
                   <div className="mt-3 flex items-center justify-between">
-                    {price ? (
+                    {formattedPrice ? (
                       <span className="text-base font-semibold text-gray-900">
-                        ${price}
+                        {formattedPrice}
                       </span>
                     ) : (
                       <span className="text-sm text-gray-500">Sin precio</span>

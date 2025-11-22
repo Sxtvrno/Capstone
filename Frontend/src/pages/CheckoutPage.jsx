@@ -176,91 +176,94 @@ export default function CheckoutPage() {
           </div>
 
           <ul className="space-y-4">
-            {items.map((it) => (
-              <li
-                key={it.id}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border">
-                    <img
-                      src={it.image || "/no-image.png"}
-                      alt={it.name}
-                      className="h-full w-full object-cover"
-                      onError={(e) =>
-                        (e.currentTarget.style.visibility = "hidden")
-                      }
-                    />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-base font-medium text-gray-900">
-                          {it.name || it.title || it.nombre || (it.raw && (it.raw.title || it.raw.nombre || it.raw.name)) || `Producto ${it.id}`}
-                        </h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          ${
-                            (it.unit_price ?? it.price ?? 0).toFixed(2)
-                          } c/u
-                        </p>
-                      </div>
-                      <div className="text-right text-base font-semibold text-gray-900">
-                        ${
-                          (it.total_price ?? (it.unit_price ?? it.price ?? 0) * (it.quantity ?? 1)).toFixed(2)
+            {items.map((it, idx) => {
+              // Robust id fallback for key and actions
+              const productId = it.id ?? it.producto_id ?? it.productId ?? (it.raw && (it.raw.id ?? it.raw.producto_id ?? it.raw.productId)) ?? idx;
+              return (
+                <li
+                  key={productId}
+                  className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border">
+                      <img
+                        src={it.image || "/no-image.png"}
+                        alt={it.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) =>
+                          (e.currentTarget.style.visibility = "hidden")
                         }
-                      </div>
+                      />
                     </div>
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className="inline-flex items-center rounded-lg border border-gray-200">
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-base font-medium text-gray-900">
+                            {it.name || it.title || it.nombre || (it.raw && (it.raw.title || it.raw.nombre || it.raw.name)) || `Producto ${it.id}`}
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {`${(it.unit_price ?? it.price ?? 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 })} c/u`}
+                          </p>
+                        </div>
+                        <div className="text-right text-base font-semibold text-gray-900">
+                          { (it.total_price ?? (it.unit_price ?? it.price ?? 0) * (it.quantity ?? 1)).toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }) }
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="inline-flex items-center rounded-lg border border-gray-200">
+                          <button
+                            onClick={() =>
+                              !cartLoading && productId && updateQuantity(
+                                productId,
+                                Math.max(1, (it.quantity ?? 1) - 1)
+                              )
+                            }
+                            className="h-9 w-9 rounded-l-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                            aria-label="Disminuir"
+                            disabled={cartLoading || (it.quantity ?? 1) <= 1 || !productId}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            className="h-9 w-14 border-x border-gray-200 text-center text-sm outline-none"
+                            value={it.quantity ?? 1}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value || "1", 10);
+                              if (!cartLoading && productId) {
+                                updateQuantity(
+                                  productId,
+                                  isNaN(val) ? 1 : Math.max(1, val)
+                                );
+                              }
+                            }}
+                            disabled={cartLoading || !productId}
+                          />
+                          <button
+                            onClick={() =>
+                              !cartLoading && productId && updateQuantity(productId, (it.quantity ?? 1) + 1)
+                            }
+                            className="h-9 w-9 rounded-r-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                            aria-label="Aumentar"
+                            disabled={cartLoading || !productId}
+                          >
+                            +
+                          </button>
+                        </div>
                         <button
-                          onClick={() =>
-                            updateQuantity(
-                              it.id,
-                              Math.max(1, (it.quantity ?? 1) - 1)
-                            )
-                          }
-                          className="h-9 w-9 rounded-l-lg text-gray-700 hover:bg-gray-50"
-                          aria-label="Disminuir"
+                          onClick={() => !cartLoading && productId && removeFromCart(productId)}
+                          className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                          disabled={cartLoading || !productId}
                         >
-                          −
-                        </button>
-                        <input
-                          type="number"
-                          min={1}
-                          className="h-9 w-14 border-x border-gray-200 text-center text-sm outline-none"
-                          value={it.quantity ?? 1}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value || "1", 10);
-                            updateQuantity(
-                              it.id,
-                              isNaN(val) ? 1 : Math.max(1, val)
-                            );
-                          }}
-                        />
-                        <button
-                          onClick={() =>
-                            updateQuantity(it.id, (it.quantity ?? 1) + 1)
-                          }
-                          className="h-9 w-9 rounded-r-lg text-gray-700 hover:bg-gray-50"
-                          aria-label="Aumentar"
-                        >
-                          +
+                          Quitar
                         </button>
                       </div>
-
-                      <button
-                        onClick={() => removeFromCart(it.id)}
-                        className="text-sm font-medium text-red-600 hover:text-red-700"
-                      >
-                        Quitar
-                      </button>
                     </div>
                   </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
 
@@ -275,7 +278,7 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium text-gray-900">
-                  ${subtotal.toFixed(2)}
+                  {subtotal.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 })}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -288,7 +291,7 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between text-base">
                 <span className="font-semibold text-gray-900">Total</span>
                 <span className="font-bold text-gray-900">
-                  ${subtotal.toFixed(2)}
+                  {subtotal.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 })}
                 </span>
               </div>
             </div>
