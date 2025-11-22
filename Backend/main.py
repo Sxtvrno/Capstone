@@ -1554,9 +1554,9 @@ async def admin_list_pedidos(
             # Obtener items del pedido
             items = await conn.fetch(
                 """
-                SELECT dp.producto_id, dp.quantity, dp.unit_price,
+                SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
                        p.title as product_name
-                FROM detallepedido dp
+                FROM detalle_pedido dp
                 LEFT JOIN producto p ON p.id = dp.producto_id
                 WHERE dp.pedido_id = $1
                 ORDER BY dp.producto_id
@@ -1594,12 +1594,12 @@ async def client_list_pedidos(
             pedido = dict(r)
             items = await conn.fetch(
                 """
-                SELECT dp.producto_id, dp.quantity, dp.unit_price,
-                       p.title as product_name
-                FROM detallepedido dp
-                LEFT JOIN producto p ON p.id = dp.producto_id
-                WHERE dp.pedido_id = $1
-                ORDER BY dp.producto_id
+                  SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                      p.title as product_name
+                  FROM detalle_pedido dp
+                  LEFT JOIN producto p ON p.id = dp.producto_id
+                  WHERE dp.pedido_id = $1
+                  ORDER BY dp.producto_id
                 """,
                 pedido["id"],
             )
@@ -1655,12 +1655,12 @@ async def get_pedido_for_boleta(
 
         items = await conn.fetch(
             """
-            SELECT dp.producto_id, dp.quantity, dp.unit_price,
-                   p.title as product_name, p.sku
-            FROM detallepedido dp
-            LEFT JOIN producto p ON p.id = dp.producto_id
-            WHERE dp.pedido_id = $1
-            ORDER BY dp.producto_id
+                 SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                     p.title as product_name, p.sku
+                 FROM detalle_pedido dp
+                 LEFT JOIN producto p ON p.id = dp.producto_id
+                 WHERE dp.pedido_id = $1
+                 ORDER BY dp.producto_id
             """,
             pedido_id,
         )
@@ -1727,12 +1727,12 @@ async def send_boleta_email(
         if not payload or payload.include_items:
             rows = await conn.fetch(
                 """
-                SELECT dp.producto_id, dp.quantity, dp.unit_price,
-                       p.title as product_name
-                FROM detallepedido dp
-                LEFT JOIN producto p ON p.id = dp.producto_id
-                WHERE dp.pedido_id = $1
-                ORDER BY dp.producto_id
+                  SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                      p.title as product_name
+                  FROM detalle_pedido dp
+                  LEFT JOIN producto p ON p.id = dp.producto_id
+                  WHERE dp.pedido_id = $1
+                  ORDER BY dp.producto_id
                 """,
                 pedido_id,
             )
@@ -2605,7 +2605,6 @@ async def eliminar_direccion(
 
 # ==================== CRUD ADMINISTRADORES ====================
 
-
 @app.post(
     "/api/administradores/",
     response_model=AdministradorResponse,
@@ -2891,10 +2890,10 @@ async def tbk_create(
                                 unit_price = float(prod["price"])
                             await conn.execute(
                                 """
-                                INSERT INTO detallepedido (pedido_id, producto_id, quantity, unit_price)
+                                INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
                                 VALUES ($1, $2, $3, $4)
                                 ON CONFLICT (pedido_id, producto_id) DO UPDATE
-                                SET quantity = EXCLUDED.quantity, unit_price = EXCLUDED.unit_price
+                                SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
                                 """,
                                 pedido_id_created,
                                 pid,
@@ -2922,10 +2921,10 @@ async def tbk_create(
                                 unit_price = float(prod["price"])
                             await conn.execute(
                                 """
-                                INSERT INTO detallepedido (pedido_id, producto_id, quantity, unit_price)
+                                INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
                                 VALUES ($1, $2, $3, $4)
                                 ON CONFLICT (pedido_id, producto_id) DO UPDATE
-                                SET quantity = EXCLUDED.quantity, unit_price = EXCLUDED.unit_price
+                                SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
                                 """,
                                 pedido_id_created,
                                 pid,
@@ -2989,6 +2988,7 @@ async def tbk_create(
         raise HTTPException(status_code=500, detail="Error al crear la transacción")
 
 
+
 @app.post("/api/transbank/confirm")
 async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_db)):
     try:
@@ -2998,174 +2998,46 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
         tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
         resp = tx.commit(payload.token_ws)
         status = resp.get("status")
-<<<<<<< HEAD
         buy_order = resp.get("buy_order")
-        
-        if status == "AUTHORIZED":
-            # Si el pago es exitoso, actualizar estado del pedido
-            if buy_order and buy_order in pending_transactions:
-                transaction_data = pending_transactions[buy_order]
-                pedido_id = transaction_data.get("pedido_id")
-                
-                if pedido_id:
-                    # Actualizar estado del pedido a "en preparación" después del pago exitoso
-                    await db.execute("""
-                        UPDATE pedido 
-                        SET order_status = 'en preparación',
-                            updated_at = NOW()
-                        WHERE pedido_id = $1
-                    """, pedido_id)
-                    
-                    # Registrar el pago en la tabla pago
-                    await db.execute("""
-                        INSERT INTO pago (pedido_id, metodo_pago, monto, estado_pago, fecha_pago, transaccion_id)
-                        VALUES ($1, 'Webpay', $2, 'completado', NOW(), $3)
-                    """, pedido_id, resp.get("amount"), resp.get("authorization_code"))
-                    
-                    logger.info(f"Pedido {pedido_id} actualizado a 'en preparación' y pago registrado")
-                
-                # Limpiar transacción pendiente
-                del pending_transactions[buy_order]
-            
-            return {
-                "status": "success",
-                "buy_order": buy_order,
-=======
 
-        # Intentar encontrar metadata temporal por token_ws
+        # Buscar metadata temporal por token_ws
         meta = pending_transactions.get(payload.token_ws)
         pedido_id = None
-        pedido_db = None
-
         if meta and meta.get("pedido_id"):
             pedido_id = meta["pedido_id"]
-            try:
-                pedido_db = await conn.fetchrow(
-                    "SELECT id FROM pedido WHERE id = $1", pedido_id
-                )
-            except Exception as e:
-                logger.debug(
-                    f"No se pudo buscar Pedido por id desde pending_transactions: {e}"
-                )
-                pedido_db = None
-
-        # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
-        if not pedido_id:
-            buy_order = resp.get("buy_order")
-            if buy_order:
+        else:
+            # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
+            if buy_order and buy_order.startswith("O"):
                 try:
-                    # extraer dígitos luego de 'O'
-                    s = str(buy_order)
-                    if s.startswith("O"):
-                        possible = s[1:]
-                        # tomar la secuencia inicial de dígitos
-                        digits = ""
-                        for ch in possible:
-                            try:
-                                if not payload.token_ws:
-                                    raise HTTPException(status_code=400, detail="token_ws requerido")
+                    pedido_id = int(''.join(filter(str.isdigit, buy_order[1:])))
+                except Exception:
+                    pedido_id = None
 
-                                tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
-                                resp = tx.commit(payload.token_ws)
-                                status = resp.get("status")
-                                buy_order = resp.get("buy_order")
-
-                                # Buscar metadata temporal por token_ws
-                                meta = pending_transactions.get(payload.token_ws)
-                                pedido_id = None
-                                if meta and meta.get("pedido_id"):
-                                    pedido_id = meta["pedido_id"]
-                                else:
-                                    # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
-                                    if buy_order and buy_order.startswith("O"):
-                                        try:
-                                            pedido_id = int(''.join(filter(str.isdigit, buy_order[1:])))
-                                        except Exception:
-                                            pedido_id = None
-
-                                if status == "AUTHORIZED":
-                                    # Intentar actualizar Pedido a "Pagado" (si se encontró)
-                                    try:
-                                        if pedido_id:
-                                            await conn.execute(
-                                                """
-                                                UPDATE pedido 
-                                                SET order_status = 'pagado',
-                                                    notas = 'Pago autorizado por Transbank',
-                                                    updated_at = NOW()
-                                                WHERE id = $1
-                                                """,
-                                                pedido_id,
-                                            )
-                                            logger.info(f"Pedido {pedido_id} marcado como pagado por pago autorizado")
-                                    except Exception as e:
-                                        logger.error(f"Error actualizando pedido pagado: {e}")
-
-                                    return {
-                                        "status": "success",
-                                        "pedido_id": pedido_id,
-                                        "buy_order": buy_order,
-                                        "amount": resp.get("amount"),
-                                        "authorization_code": resp.get("authorization_code"),
-                                        "payment_type_code": resp.get("payment_type_code"),
-                                        "response_code": resp.get("response_code"),
-                                        "installments_number": resp.get("installments_number"),
-                                    }
-                                else:
-                                    # Si el pago fue rechazado, actualizar pedido a cancelado (si existe)
-                                    if buy_order and buy_order in pending_transactions:
-                                        transaction_data = pending_transactions[buy_order]
-                                        pedido_id = transaction_data.get("pedido_id")
-                                        if pedido_id:
-                                            await conn.execute(
-                                                """
-                                                UPDATE pedido 
-                                                SET order_status = 'cancelado',
-                                                    notas = 'Pago rechazado por Transbank',
-                                                    updated_at = NOW()
-                                                WHERE id = $1
-                                                """,
-                                                pedido_id,
-                                            )
-                                            logger.info(f"Pedido {pedido_id} marcado como cancelado por pago rechazado")
-                                        del pending_transactions[buy_order]
-                                    return {"status": "rejected", "detail": resp}
-                            except HTTPException:
-                                raise
-                            except Exception as e:
-                                logger.error(f"Error confirmando transacción: {e}")
-                                raise HTTPException(status_code=500, detail="Error al confirmar la transacción")
-                            float(amount_val) if amount_val is not None else None
-                        )
-                    except Exception:
-                        amount_val = None
-
-                    # Ejecutar update con los 4 parámetros esperados
+        if status == "AUTHORIZED":
+            # Intentar actualizar Pedido a "Pagado" (si se encontró)
+            try:
+                if pedido_id:
                     await conn.execute(
-                        update_q, "Pagado", amount_val, transaction_date, pedido_id
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'pagado',
+                            notas = 'Pago autorizado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
                     )
-
-                    # eliminar meta temporal si existe
-                    pending_transactions.pop(payload.token_ws, None)
-                else:
-                    logger.debug(
-                        "Transbank autorizado pero no se encontró pedido asociado para actualizar."
-                    )
+                    logger.info(f"Pedido {pedido_id} marcado como pagado por pago autorizado")
             except Exception as e:
-                logger.error(f"Error actualizando Pedido a Pagado: {e}")
+                logger.error(f"Error actualizando pedido pagado: {e}")
 
-            # devolver pedido_id si está disponible para que el frontend lo use
-            pedido_id_for_resp = None
-            if meta and meta.get("pedido_id"):
-                pedido_id_for_resp = meta.get("pedido_id")
-            elif pedido_id:
-                pedido_id_for_resp = pedido_id
+            # eliminar meta temporal si existe
+            pending_transactions.pop(payload.token_ws, None)
 
             return {
                 "status": "success",
-                "pedido_id": pedido_id_for_resp,
-                "buy_order": resp.get("buy_order"),
->>>>>>> a6836ea3dfdfd41d19dffc0aaf09ae304378ecc5
+                "pedido_id": pedido_id,
+                "buy_order": buy_order,
                 "amount": resp.get("amount"),
                 "authorization_code": resp.get("authorization_code"),
                 "payment_type_code": resp.get("payment_type_code"),
@@ -3177,21 +3049,19 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
             if buy_order and buy_order in pending_transactions:
                 transaction_data = pending_transactions[buy_order]
                 pedido_id = transaction_data.get("pedido_id")
-                
                 if pedido_id:
-                    await db.execute("""
+                    await conn.execute(
+                        """
                         UPDATE pedido 
                         SET order_status = 'cancelado',
                             notas = 'Pago rechazado por Transbank',
                             updated_at = NOW()
-                        WHERE pedido_id = $1
-                    """, pedido_id)
-                    
+                        WHERE id = $1
+                        """,
+                        pedido_id,
+                    )
                     logger.info(f"Pedido {pedido_id} marcado como cancelado por pago rechazado")
-                
-                # Limpiar transacción pendiente
                 del pending_transactions[buy_order]
-            
             return {"status": "rejected", "detail": resp}
     except HTTPException:
         raise
@@ -3228,7 +3098,137 @@ logger.info(
 
 
 # Almacenamiento temporal de transacciones
-pending_transactions = {}
+@app.post("/api/transbank/confirm")
+async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_db)):
+    try:
+        if not payload.token_ws:
+            raise HTTPException(status_code=400, detail="token_ws requerido")
+
+        tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
+        resp = tx.commit(payload.token_ws)
+        status = resp.get("status")
+        buy_order = resp.get("buy_order")
+
+        # Buscar metadata temporal por token_ws
+        meta = pending_transactions.get(payload.token_ws)
+        pedido_id = None
+        if meta and meta.get("pedido_id"):
+            pedido_id = meta["pedido_id"]
+        else:
+            # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
+            if buy_order and buy_order.startswith("O"):
+                try:
+                    pedido_id = int(''.join(filter(str.isdigit, buy_order[1:])))
+                except Exception:
+                    pedido_id = None
+
+        if status == "AUTHORIZED":
+            try:
+                if pedido_id:
+                    # 1. Actualizar pedido a pagado
+                    await conn.execute(
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'pagado',
+                            notas = 'Pago autorizado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
+                    )
+
+                    # 2. Insertar en pago
+                    await conn.execute(
+                        """
+                        INSERT INTO pago (order_id, payment_method, payment_status, transaction_id, amount, payment_date, authorization_code, payment_type_code)
+                        VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+                        """,
+                        pedido_id,
+                        resp.get("payment_type_code") or "webpay",
+                        status,
+                        resp.get("buy_order"),
+                        float(resp.get("amount", 0)),
+                        resp.get("authorization_code"),
+                        resp.get("payment_type_code"),
+                    )
+
+                    # 3. Asegurar que detalle_pedido esté poblado
+                    detalles = await conn.fetch(
+                        "SELECT 1 FROM detalle_pedido WHERE pedido_id = $1 LIMIT 1",
+                        pedido_id,
+                    )
+                    if not detalles:
+                        # Si no hay detalles, intentar poblar desde carrito del cliente
+                        pedido = await conn.fetchrow("SELECT cliente_id FROM pedido WHERE id = $1", pedido_id)
+                        if pedido:
+                            cliente_id = pedido["cliente_id"]
+                            cart = await conn.fetchrow("SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id)
+                            if cart:
+                                cart_id = cart["id"]
+                                cart_items = await conn.fetch(
+                                    """
+                                    SELECT producto_id, quantity, total_price FROM ArticuloCarrito WHERE carrito_id = $1
+                                    """,
+                                    cart_id,
+                                )
+                                for it in cart_items:
+                                    pid = it["producto_id"]
+                                    qty = max(int(it["quantity"] or 1), 1)
+                                    total_price_item = float(it["total_price"] or 0)
+                                    unit_price = total_price_item / qty if qty > 0 and total_price_item > 0 else 0
+                                    await conn.execute(
+                                        """
+                                        INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
+                                        VALUES ($1, $2, $3, $4)
+                                        ON CONFLICT (pedido_id, producto_id) DO UPDATE
+                                        SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
+                                        """,
+                                        pedido_id,
+                                        pid,
+                                        qty,
+                                        unit_price,
+                                    )
+
+            except Exception as e:
+                logger.error(f"Error en confirmación de pago: {e}")
+
+            # eliminar meta temporal si existe
+            pending_transactions.pop(payload.token_ws, None)
+
+            return {
+                "status": "success",
+                "pedido_id": pedido_id,
+                "buy_order": buy_order,
+                "amount": resp.get("amount"),
+                "authorization_code": resp.get("authorization_code"),
+                "payment_type_code": resp.get("payment_type_code"),
+                "response_code": resp.get("response_code"),
+                "installments_number": resp.get("installments_number"),
+            }
+        else:
+            # Si el pago fue rechazado, actualizar pedido a cancelado (si existe)
+            if buy_order and buy_order in pending_transactions:
+                transaction_data = pending_transactions[buy_order]
+                pedido_id = transaction_data.get("pedido_id")
+                if pedido_id:
+                    await conn.execute(
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'cancelado',
+                            notas = 'Pago rechazado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
+                    )
+                    logger.info(f"Pedido {pedido_id} marcado como cancelado por pago rechazado")
+                del pending_transactions[buy_order]
+            return {"status": "rejected", "detail": resp}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirmando transacción: {e}")
+        raise HTTPException(status_code=500, detail="Error al confirmar la transacción")
 
 
 # ==================== ENDPOINTS CHATBOT ====================
@@ -3843,7 +3843,7 @@ async def root():
     }
 
 
-<<<<<<< HEAD
+ 
 # Configuración Transbank (FORZAR TEST)
 TBK_ENV = (os.getenv("TBK_ENV") or "TEST").upper()
 TBK_INTEGRATION_TYPE = IntegrationType.TEST  # forzar test
@@ -4571,7 +4571,7 @@ async def create_order_from_cart(
             # Insertar detalles del pedido
             for item in cart_items:
                 await db.execute("""
-                    INSERT INTO detallepedido (pedido_id, producto_id, quantity, unit_price)
+                    INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
                     VALUES ($1, $2, $3, $4)
                 """, pedido_id, item['producto_id'], item['quantity'], float(item['price']))
                 
@@ -4595,9 +4595,9 @@ async def create_order_from_cart(
             
             # Obtener productos
             productos = await db.fetch("""
-                SELECT dp.producto_id, pr.title, dp.quantity, dp.unit_price,
-                       (dp.quantity * dp.unit_price) as subtotal
-                FROM detallepedido dp
+                  SELECT dp.producto_id, pr.title, dp.cantidad, dp.precio_unitario,
+                      (dp.cantidad * dp.precio_unitario) as subtotal
+                FROM detalle_pedido dp
                 JOIN producto pr ON dp.producto_id = pr.id
                 WHERE dp.pedido_id = $1
             """, pedido_id)
@@ -4705,10 +4705,10 @@ async def get_order_detail(
             SELECT 
                 dp.producto_id,
                 pr.title,
-                dp.quantity,
-                dp.unit_price,
-                (dp.quantity * dp.unit_price) as subtotal
-            FROM detallepedido dp
+                dp.cantidad,
+                dp.precio_unitario,
+                (dp.cantidad * dp.precio_unitario) as subtotal
+            FROM detalle_pedido dp
             JOIN producto pr ON dp.producto_id = pr.id
             WHERE dp.pedido_id = $1
             ORDER BY dp.producto_id
@@ -4849,10 +4849,10 @@ async def get_my_orders(
                 SELECT 
                     dp.producto_id,
                     pr.title,
-                    dp.quantity,
-                    dp.unit_price,
-                    (dp.quantity * dp.unit_price) as subtotal
-                FROM detallepedido dp
+                    dp.cantidad,
+                    dp.precio_unitario,
+                    (dp.cantidad * dp.precio_unitario) as subtotal
+                FROM detalle_pedido dp
                 JOIN producto pr ON dp.producto_id = pr.id
                 WHERE dp.pedido_id = $1
                 ORDER BY dp.producto_id
@@ -4887,8 +4887,8 @@ async def get_my_orders(
 # ==================== FIN ENDPOINTS PEDIDOS ====================
 
 
-=======
->>>>>>> a6836ea3dfdfd41d19dffc0aaf09ae304378ecc5
+ 
+ 
 # Lifecycle
 @app.on_event("startup")
 async def startup():

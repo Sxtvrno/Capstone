@@ -593,20 +593,6 @@ export const orderAPI = {
     return response.data;
   },
 };
-
-const text = await res.text();
-try {
-  const data = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(JSON.stringify(data || text));
-  return data;
-} catch (e) {
-  if (!res.ok) throw new Error(`Transbank confirm failed ${res.status}: ${text}`);
-  return text;
-}
-  },
-
-  // ...existing exports...
-};
 // API de Tickets de Soporte
 export const ticketsAPI = {
   // Obtener todos los tickets (con filtro opcional de estado)
