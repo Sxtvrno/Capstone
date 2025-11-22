@@ -527,16 +527,82 @@ export const transbankAPI = {
       headers,
       body: JSON.stringify({ token_ws }),
     });
-
-    const text = await res.text();
-    try {
-      const data = text ? JSON.parse(text) : {};
-      if (!res.ok) throw new Error(JSON.stringify(data || text));
-      return data;
-    } catch (e) {
-      if (!res.ok) throw new Error(`Transbank confirm failed ${res.status}: ${text}`);
-      return text;
+    if (!res.ok) {
+      const t = await res.json().catch(() => ({}));
+      throw new Error(t.detail || "Error al confirmar transacción");
     }
+    return res.json();
+  },
+
+  // Compatibilidad: obtener pedido por id (usa endpoint /api/pedidos/{id})
+  async getPedido(pedidoId) {
+    const res = await fetch(`${BASE_URL}/api/pedidos/${pedidoId}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    });
+    if (!res.ok) {
+      const t = await res.json().catch(() => ({}));
+      throw new Error(t.detail || "Error al obtener pedido");
+    }
+    return res.json();
+  },
+
+  // Compatibilidad: enviar boleta por correo (POST /api/pedidos/{id}/send-receipt)
+  async sendBoletaEmail(pedidoId) {
+    const res = await fetch(
+      `${BASE_URL}/api/pedidos/${pedidoId}/send-receipt`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      }
+    );
+    if (!res.ok) {
+      const t = await res.json().catch(() => ({}));
+      throw new Error(t.detail || "Error al enviar boleta por correo");
+    }
+    return res.json();
+  },
+};
+
+// ==================== ORDERS / PEDIDOS API ====================
+// Usa axios (incluye interceptor de auth) para estas operaciones
+export const orderAPI = {
+  // Admin: listar todos los pedidos con cliente e items
+  async adminGetAll() {
+    const response = await axios.get(`${API_URL}/api/admin/pedidos`);
+    return response.data;
+  },
+
+  // Cliente autenticado: listar sus pedidos
+  async clientGetAll() {
+    const response = await axios.get(`${API_URL}/api/client/pedidos`);
+    return response.data;
+  },
+
+  // Obtener un pedido por id (con items) - usado por la boleta
+  async getById(id) {
+    const response = await axios.get(`${API_URL}/api/pedidos/${id}`);
+    return response.data;
+  },
+
+  // Enviar boleta por correo (backend: POST /api/pedidos/{id}/send-receipt)
+  async sendReceipt(id) {
+    const response = await axios.post(
+      `${API_URL}/api/pedidos/${id}/send-receipt`
+    );
+    return response.data;
+  },
+};
+
+const text = await res.text();
+try {
+  const data = text ? JSON.parse(text) : {};
+  if (!res.ok) throw new Error(JSON.stringify(data || text));
+  return data;
+} catch (e) {
+  if (!res.ok) throw new Error(`Transbank confirm failed ${res.status}: ${text}`);
+  return text;
+}
   },
 
   // ...existing exports...
@@ -709,6 +775,6 @@ export default {
   emailAPI,
   transbankAPI,
   ticketsAPI,
-  ordersAPI,
+  orderAPI,
   API_URL,
 };

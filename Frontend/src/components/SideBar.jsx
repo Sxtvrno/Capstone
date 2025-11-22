@@ -119,6 +119,25 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
         </svg>
       ),
     },
+    {
+      id: "pedidos",
+      label: "Pedidos",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 7.5l9-4.5 9 4.5M3 7.5l9 4.5 9-4.5M3 7.5v9l9 4.5 9-4.5v-9"
+          />
+        </svg>
+      ),
+    },
   ];
 
   return (
