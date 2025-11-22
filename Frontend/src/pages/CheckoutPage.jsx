@@ -197,7 +197,7 @@ export default function CheckoutPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="text-base font-medium text-gray-900">
-                          {it.name}
+                          {it.name || it.title || it.nombre || (it.raw && (it.raw.title || it.raw.nombre || it.raw.name)) || `Producto ${it.id}`}
                         </h3>
                         <p className="mt-1 text-sm text-gray-500">
                           ${
