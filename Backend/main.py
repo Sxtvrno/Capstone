@@ -847,6 +847,30 @@ async def get_cart(
     )
     return await get_cart_summary(conn, cart_id)
 
+@app.get("/api/cart/items", response_model=CartResponse)
+async def get_cart_items(
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Obtener los items del carrito.
+    - Cliente autenticado: ignora session_id y usa su carrito.
+    - Anónimo: requiere session_id.
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+    await conn.execute(
+        "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+    )
+    return await get_cart_summary(conn, cart_id)
 
 @app.post("/api/cart/items", response_model=CartResponse)
 async def add_item_cart(
@@ -2808,14 +2832,37 @@ async def tbk_create(
         if not payload.amount or int(payload.amount) <= 0:
             raise HTTPException(status_code=400, detail="Monto inválido")
 
-        # Si el usuario está autenticado y no hay pedido_id, crear pedido automáticamente
-        pedido_id = payload.pedido_id
-
         if not current_user or current_user.get("role") != ROLE_CLIENTE:
             raise HTTPException(
                 status_code=400,
                 detail="Cliente autenticado requerido para crear pedido",
             )
+
+        cliente_id = current_user["id"]
+
+        # Buscar si ya existe un pedido pendiente para este cliente
+        pedido_row = await conn.fetchrow(
+            "SELECT id FROM pedido WHERE cliente_id = $1 AND order_status = 'Pendiente' ORDER BY created_at DESC LIMIT 1",
+            cliente_id,
+        )
+        if pedido_row:
+            pedido_id = pedido_row["id"]
+        else:
+            # Crear nuevo pedido
+            insert_q = """
+                INSERT INTO pedido (cliente_id, order_status, shipping_address, total_price, created_at)
+                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                RETURNING id
+            """
+            shipping_address = "No especificado"
+            row = await conn.fetchrow(
+                insert_q,
+                cliente_id,
+                "Pendiente",
+                shipping_address,
+                float(payload.amount),
+            )
+            pedido_id = row["id"] if row else None
 
         def make_buy_order(pedido_id: Optional[int]) -> str:
             base = (
@@ -2832,127 +2879,77 @@ async def tbk_create(
         pending_transactions[buy_order] = {
             "pedido_id": pedido_id,
             "amount": int(payload.amount),
-            "cliente_id": current_user.get("id") if current_user else None,
+            "cliente_id": cliente_id,
             "session_id": payload.session_id,
         }
 
-        cliente_id = current_user["id"]
-
-        pedido_id_created = None
-        try:
-            async with conn.transaction():
-                insert_q = """
-                    INSERT INTO pedido (cliente_id, order_status, shipping_address, total_price, created_at)
-                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                    RETURNING id
-                """
-                shipping_address = "No especificado"
-                row = await conn.fetchrow(
-                    insert_q,
-                    cliente_id,
-                    "Pendiente",
-                    shipping_address,
-                    float(payload.amount),
+        # Insertar detalle_pedido si no existe
+        detalles = await conn.fetch(
+            "SELECT 1 FROM detalle_pedido WHERE pedido_id = $1 LIMIT 1",
+            pedido_id,
+        )
+        if not detalles:
+            # Obtener items del carrito
+            cart = await conn.fetchrow(
+                "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
+            )
+            cart_items = []
+            if cart:
+                cart_id = cart["id"]
+                cart_items = await conn.fetch(
+                    """
+                    SELECT producto_id, quantity, total_price
+                    FROM ArticuloCarrito
+                    WHERE carrito_id = $1
+                    """,
+                    cart_id,
                 )
-                pedido_id_created = row["id"] if row else None
-
-                if pedido_id_created:
-                    # Primero intentar obtener items desde el carrito del cliente
-                    cart = await conn.fetchrow(
-                        "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
-                    )
-                    cart_items = []
-                    if cart:
-                        cart_id = cart["id"]
-                        cart_items = await conn.fetch(
-                            """
-                            SELECT producto_id, quantity, total_price
-                            FROM ArticuloCarrito
-                            WHERE carrito_id = $1
-                            """,
-                            cart_id,
-                        )
-
-                    total_calc = 0.0
-
-                    # Si no hay items en el carrito, usar payload.items si vienen
-                    if (not cart_items) and payload.items:
-                        for it in payload.items:
-                            pid = it.producto_id
-                            qty = max(int(it.quantity or 1), 1)
-                            # prioridad: unit_price > total_price/qty > producto.price from Producto
-                            if it.unit_price is not None:
-                                unit_price = float(it.unit_price)
-                            elif it.total_price is not None:
-                                unit_price = float(it.total_price) / qty
-                            else:
-                                prod = await ensure_product_and_price(conn, pid)
-                                unit_price = float(prod["price"])
-                            await conn.execute(
-                                """
-                                INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
-                                VALUES ($1, $2, $3, $4)
-                                ON CONFLICT (pedido_id, producto_id) DO UPDATE
-                                SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
-                                """,
-                                pedido_id_created,
-                                pid,
-                                qty,
-                                unit_price,
-                            )
-                            total_calc += unit_price * qty
-                    else:
-                        # usar items del carrito (si existen)
-                        for it in cart_items:
-                            pid = it["producto_id"]
-                            qty = max(int(it["quantity"] or 1), 1)
-                            total_price_item = (
-                                float(it["total_price"])
-                                if it["total_price"] is not None
-                                else 0.0
-                            )
-                            unit_price = (
-                                total_price_item / qty
-                                if qty > 0 and total_price_item > 0
-                                else None
-                            )
-                            if unit_price is None:
-                                prod = await ensure_product_and_price(conn, pid)
-                                unit_price = float(prod["price"])
-                            await conn.execute(
-                                """
-                                INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
-                                VALUES ($1, $2, $3, $4)
-                                ON CONFLICT (pedido_id, producto_id) DO UPDATE
-                                SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
-                                """,
-                                pedido_id_created,
-                                pid,
-                                qty,
-                                unit_price,
-                            )
-                            total_calc += unit_price * qty
-
-                    # Actualizar total_price del pedido con el cálculo real si es distinto
-                    if total_calc > 0:
-                        await conn.execute(
-                            "UPDATE pedido SET total_price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-                            total_calc,
-                            pedido_id_created,
-                        )
-
-                    # Limpiar carrito (opcional)
-                    if cart and cart_items:
-                        await conn.execute(
-                            "DELETE FROM ArticuloCarrito WHERE carrito_id = $1", cart_id
-                        )
-                        await conn.execute(
-                            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-                            cart_id,
-                        )
-        except Exception as e:
-            logger.error(f"Error creando pedido y detalle en DB: {e}")
-            pedido_id_created = None
+            total_calc = 0.0
+            for it in cart_items:
+                pid = it["producto_id"]
+                qty = max(int(it["quantity"] or 1), 1)
+                total_price_item = (
+                    float(it["total_price"])
+                    if it["total_price"] is not None
+                    else 0.0
+                )
+                unit_price = (
+                    total_price_item / qty
+                    if qty > 0 and total_price_item > 0
+                    else None
+                )
+                if unit_price is None:
+                    prod = await ensure_product_and_price(conn, pid)
+                    unit_price = float(prod["price"])
+                await conn.execute(
+                    """
+                    INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (pedido_id, producto_id) DO UPDATE
+                    SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
+                    """,
+                    pedido_id,
+                    pid,
+                    qty,
+                    unit_price,
+                )
+                total_calc += unit_price * qty
+            # Actualizar total_price del pedido
+            if total_calc > 0:
+                await conn.execute(
+                    "UPDATE pedido SET total_price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+                    total_calc,
+                    pedido_id,
+                )
+            # Limpiar carrito
+            if cart and cart_items:
+                await conn.execute(
+                    "DELETE FROM ArticuloCarrito WHERE carrito_id = $1", cart_id
+                )
+                await conn.execute(
+                    "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+                    cart_id,
+                )
 
         tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
         resp = tx.create(buy_order, session_id_tbk, int(payload.amount), return_url)
@@ -2969,15 +2966,14 @@ async def tbk_create(
                 status_code=500, detail="Transbank no devolvió token o URL"
             )
 
-        if pedido_id_created:
-            pending_transactions[token] = {
-                "pedido_id": pedido_id_created,
-                "amount": float(payload.amount),
-                "buy_order": buy_order,
-            }
+        # Relacionar el token con el pedido
+        pending_transactions[token] = {
+            "pedido_id": pedido_id,
+            "amount": float(payload.amount),
+            "buy_order": buy_order,
+        }
 
-        # Devolver id del pedido junto con token/url para que el frontend lo use
-        return {"token": token, "url": url, "pedido_id": pedido_id_created}
+        return {"token": token, "url": url, "pedido_id": pedido_id}
     except HTTPException:
         raise
     except RequestValidationError as e:
@@ -3000,8 +2996,8 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
         status = resp.get("status")
         buy_order = resp.get("buy_order")
 
-        # Buscar metadata temporal por token_ws
-        meta = pending_transactions.get(payload.token_ws)
+        # Buscar metadata temporal por token_ws o buy_order
+        meta = pending_transactions.get(payload.token_ws) or pending_transactions.get(buy_order)
         pedido_id = None
         if meta and meta.get("pedido_id"):
             pedido_id = meta["pedido_id"]
@@ -3125,6 +3121,7 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
         if status == "AUTHORIZED":
             try:
                 if pedido_id:
+                    logger.info(f"[TBK_CONFIRM] Actualizando pedido {pedido_id} a pagado...")
                     # 1. Actualizar pedido a pagado
                     await conn.execute(
                         """
@@ -3136,8 +3133,11 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                         """,
                         pedido_id,
                     )
+                    logger.info(f"[TBK_CONFIRM] Pedido {pedido_id} actualizado a pagado.")
 
                     # 2. Insertar en pago
+                    logger.info(f"[TBK_CONFIRM] Insertando registro en pago para pedido {pedido_id}...")
+                    logger.info(f"[TBK_CONFIRM] Datos pago: order_id={pedido_id}, payment_method={resp.get('payment_type_code') or 'webpay'}, status={status}, transaction_id={resp.get('buy_order')}, amount={resp.get('amount')}, auth_code={resp.get('authorization_code')}, payment_type_code={resp.get('payment_type_code')}")
                     await conn.execute(
                         """
                         INSERT INTO pago (order_id, payment_method, payment_status, transaction_id, amount, payment_date, authorization_code, payment_type_code)
@@ -3151,12 +3151,14 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                         resp.get("authorization_code"),
                         resp.get("payment_type_code"),
                     )
+                    logger.info(f"[TBK_CONFIRM] Registro en pago insertado para pedido {pedido_id}.")
 
                     # 3. Asegurar que detalle_pedido esté poblado
                     detalles = await conn.fetch(
                         "SELECT 1 FROM detalle_pedido WHERE pedido_id = $1 LIMIT 1",
                         pedido_id,
                     )
+                    logger.info(f"[TBK_CONFIRM] detalle_pedido existe para pedido {pedido_id}? {'SI' if detalles else 'NO'}")
                     if not detalles:
                         # Si no hay detalles, intentar poblar desde carrito del cliente
                         pedido = await conn.fetchrow("SELECT cliente_id FROM pedido WHERE id = $1", pedido_id)
@@ -3171,11 +3173,13 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                                     """,
                                     cart_id,
                                 )
+                                logger.info(f"[TBK_CONFIRM] Insertando detalle_pedido para pedido {pedido_id} desde carrito {cart_id}, items: {len(cart_items)}")
                                 for it in cart_items:
                                     pid = it["producto_id"]
                                     qty = max(int(it["quantity"] or 1), 1)
                                     total_price_item = float(it["total_price"] or 0)
                                     unit_price = total_price_item / qty if qty > 0 and total_price_item > 0 else 0
+                                    logger.info(f"[TBK_CONFIRM] Insertando detalle_pedido: pedido_id={pedido_id}, producto_id={pid}, cantidad={qty}, precio_unitario={unit_price}")
                                     await conn.execute(
                                         """
                                         INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
@@ -3188,6 +3192,7 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                                         qty,
                                         unit_price,
                                     )
+                                logger.info(f"[TBK_CONFIRM] detalle_pedido insertado para pedido {pedido_id}.")
 
             except Exception as e:
                 logger.error(f"Error en confirmación de pago: {e}")
