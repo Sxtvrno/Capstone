@@ -6,11 +6,12 @@ export const CartContext = createContext(null);
 function normalizeProduct(raw) {
   if (!raw) return null;
   const id = raw.id ?? raw.producto_id ?? raw.productId;
-  const name = raw.nombre ?? raw.name ?? raw.title;
-  // Si viene total_price, úsalo como price (para el carrito)
-  let price = raw.precio ?? raw.price ?? raw.unit_price;
-  if (price === undefined && raw.total_price !== undefined) price = raw.total_price;
-  price = Number(price ?? 0);
+  // El nombre puede venir como title, name, nombre
+  const name = raw.title ?? raw.nombre ?? raw.name ?? `Producto ${id ?? ""}`;
+  // El precio unitario real
+  const unit_price = Number(raw.unit_price ?? raw.price ?? raw.precio ?? 0);
+  // El total del producto (unit_price * quantity) o total_price
+  const total_price = Number(raw.total_price ?? unit_price * (raw.quantity ?? 1));
   const stock =
     raw.stock ??
     raw.stock_quantity ??
@@ -18,14 +19,14 @@ function normalizeProduct(raw) {
     raw.stockQuantity ??
     Infinity;
   const image =
+    raw.url_imagen ||
     (Array.isArray(raw.images) && raw.images[0]) ||
     raw.image ||
-    raw.url_imagen ||
     raw.urlImage ||
     raw.url ||
     null;
 
-  return { id, name, price, stock, image, raw };
+  return { id, name, unit_price, total_price, stock, image, quantity: raw.quantity ?? 1, raw };
 }
 
 export function CartProvider({ children }) {
@@ -197,14 +198,15 @@ export function CartProvider({ children }) {
       }
     };
 
+
     const totalItems = useMemo(
       () => items.reduce((acc, it) => acc + (it.quantity || 0), 0),
       [items]
     );
 
+    // El subtotal debe sumar los total_price de cada item
     const subtotal = useMemo(
-      () =>
-        items.reduce((acc, it) => acc + (it.price || 0) * (it.quantity || 0), 0),
+      () => items.reduce((acc, it) => acc + (it.total_price || 0), 0),
       [items]
     );
 

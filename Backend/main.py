@@ -774,18 +774,26 @@ async def get_or_create_cart(
 
 async def get_cart_summary(conn, cart_id: int) -> CartResponse:
     rows = await conn.fetch(
-        """
+        '''
         SELECT ac.producto_id,
                ac.quantity,
                ac.total_price,
                p.title,
                p.price AS unit_price,
-               p.stock_quantity
+               p.stock_quantity,
+               img.url_imagen
         FROM ArticuloCarrito ac
         JOIN Producto p ON p.id = ac.producto_id
+        LEFT JOIN LATERAL (
+            SELECT url_imagen
+            FROM ImagenProducto
+            WHERE producto_id = p.id
+            ORDER BY id ASC
+            LIMIT 1
+        ) img ON TRUE
         WHERE ac.carrito_id = $1
         ORDER BY ac.producto_id
-        """,
+        ''',
         cart_id,
     )
     items = [
@@ -796,6 +804,7 @@ async def get_cart_summary(conn, cart_id: int) -> CartResponse:
             "quantity": r["quantity"],
             "total_price": float(r["total_price"]),
             "stock_quantity": r["stock_quantity"],
+            "url_imagen": r["url_imagen"],
         }
         for r in rows
     ]
