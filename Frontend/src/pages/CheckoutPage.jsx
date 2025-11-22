@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { transbankAPI, authAPI } from "../services/api";
 
+
+// SessionId is still needed for anonymous carts, but CartContext now manages all cart state from backend
 function ensureSessionId() {
   let sid = localStorage.getItem("cart.sessionId");
   if (!sid) {
@@ -25,6 +27,7 @@ function postToWebpay(url, token) {
   form.submit();
 }
 
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const {
@@ -34,9 +37,18 @@ export default function CheckoutPage() {
     clearCart,
     subtotal,
     totalItems,
+    loading: cartLoading,
+    error: cartError,
+    fetchCart,
   } = useCart();
   const [loadingPay, setLoadingPay] = useState(false);
   const [error, setError] = useState("");
+
+  // Always fetch cart on mount to ensure up-to-date
+  useEffect(() => {
+    fetchCart();
+    // eslint-disable-next-line
+  }, []);
 
   const requiresLogin = useMemo(() => {
     try {
@@ -48,6 +60,7 @@ export default function CheckoutPage() {
 
   const handlePay = async () => {
     setError("");
+    if (cartLoading) return;
     if (items.length === 0) {
       setError("Tu carrito está vacío.");
       return;
@@ -75,6 +88,15 @@ export default function CheckoutPage() {
     }
   };
 
+  if (cartLoading) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white p-10 shadow-sm">
+          <div className="mb-4 text-blue-600">Cargando carrito...</div>
+        </div>
+      </div>
+    );
+  }
   if (!items || items.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16">
@@ -117,11 +139,11 @@ export default function CheckoutPage() {
         Carrito de compras
       </h1>
 
-      {error && (
+      {(error || cartError) && (
         <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-red-700">
           <div className="flex">
             <svg
-              className="mr-2 h-5 w-5 flex-shrink-0"
+              className="mr-2 h-5 w-5 shrink-0"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -133,7 +155,7 @@ export default function CheckoutPage() {
                 d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span>{error}</span>
+            <span>{error || cartError}</span>
           </div>
         </div>
       )}
@@ -160,7 +182,7 @@ export default function CheckoutPage() {
                 className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-center gap-4">
-                  <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border">
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border">
                     <img
                       src={it.image || "/no-image.png"}
                       alt={it.name}
@@ -178,11 +200,15 @@ export default function CheckoutPage() {
                           {it.name}
                         </h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          ${(it.price ?? 0).toFixed(2)} c/u
+                          ${
+                            (it.unit_price ?? it.price ?? 0).toFixed(2)
+                          } c/u
                         </p>
                       </div>
                       <div className="text-right text-base font-semibold text-gray-900">
-                        ${(it.price * (it.quantity ?? 1)).toFixed(2)}
+                        ${
+                          (it.total_price ?? (it.unit_price ?? it.price ?? 0) * (it.quantity ?? 1)).toFixed(2)
+                        }
                       </div>
                     </div>
 
@@ -269,7 +295,7 @@ export default function CheckoutPage() {
 
             <button
               onClick={handlePay}
-              disabled={loadingPay}
+              disabled={loadingPay || cartLoading}
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loadingPay ? (

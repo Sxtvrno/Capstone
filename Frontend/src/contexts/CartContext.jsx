@@ -1,13 +1,16 @@
-import React, { createContext, useContext, useMemo } from "react";
-import useLocalStorage from "../hooks/useLocalStorage";
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
+import { API_URL } from "../services/api";
 
 export const CartContext = createContext(null);
 
 function normalizeProduct(raw) {
   if (!raw) return null;
   const id = raw.id ?? raw.producto_id ?? raw.productId;
-  const name = raw.nombre ?? raw.name ?? raw.title ?? `Producto ${id ?? ""}`;
-  const price = Number(raw.precio ?? raw.price ?? raw.unit_price ?? 0);
+  const name = raw.nombre ?? raw.name ?? raw.title;
+  // Si viene total_price, úsalo como price (para el carrito)
+  let price = raw.precio ?? raw.price ?? raw.unit_price;
+  if (price === undefined && raw.total_price !== undefined) price = raw.total_price;
+  price = Number(price ?? 0);
   const stock =
     raw.stock ??
     raw.stock_quantity ??
@@ -26,156 +29,200 @@ function normalizeProduct(raw) {
 }
 
 export function CartProvider({ children }) {
-  const [items, setItems] = useLocalStorage("cart.items", []);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const addToCart = (productInput, qty = 1) => {
-    const p = normalizeProduct(productInput);
-    if (!p || !p.id) return;
-
-    setItems((prev) => {
-      const idx = prev.findIndex((it) => it.id === p.id);
-      const nextQty = Math.max(
-        1,
-        Math.min((prev[idx]?.quantity ?? 0) + qty, p.stock)
-      );
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = { ...copy[idx], quantity: nextQty };
-        return copy;
-      } else {
-        return [
-          ...prev,
-          {
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            image: p.image,
-            quantity: Math.max(1, Math.min(qty, p.stock)),
-          },
-        ];
-      }
-    });
-  };
-
-  const updateQuantity = (productId, qty) => {
-    setItems((prev) =>
-      prev
-        .map((it) =>
-          it.id === productId
-            ? { ...it, quantity: Math.max(0, Math.floor(qty || 0)) }
-            : it
-        )
-        .filter((it) => it.quantity > 0)
-    );
-  };
-
-  const removeFromCart = (productId) => {
-    setItems((prev) => prev.filter((it) => it.id !== productId));
-  };
-
-  // Reemplaza/actualiza la función clearCart para aceptar sessionId
-  async function clearCart(sessionId) {
-    try {
-      // Protección: si se pasó un SyntheticEvent (por error en onClick), ignóralo
-      if (sessionId && typeof sessionId !== "string") {
-        if (sessionId?.nativeEvent || sessionId?.target) {
-          sessionId = undefined;
-        } else {
-          try {
-            sessionId = String(sessionId);
-          } catch {
-            sessionId = undefined;
-          }
-        }
-      }
-
-      const API_BASE =
-        import.meta.env.VITE_API_BASE ||
-        `${window.location.protocol}//${window.location.hostname}:8000`;
-
-      // Obtener token de varias claves posibles
-      let token =
-        localStorage.getItem("token") ||
-        localStorage.getItem("accessToken") ||
-        localStorage.getItem("authToken");
-
-      if (!token) {
+  // Helper to get token
+  function getToken() {
+    return (
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("authToken") ||
+      (() => {
         const authRaw = localStorage.getItem("auth");
-        if (authRaw) {
-          try {
-            const authObj = JSON.parse(authRaw);
-            token = authObj?.token || authObj?.accessToken || token;
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      // SIEMPRE intentar enviar sessionId si está en localStorage o fue pasado
-      const sid = sessionId || localStorage.getItem("cart.sessionId");
-      const bodyObj = {};
-      if (sid) bodyObj.session_id = sid;
-
-      // Debug
-      console.info("[clearCart] API_BASE:", API_BASE);
-      console.info("[clearCart] URL:", `${API_BASE}/api/cart/clear`);
-      console.info("[clearCart] headers:", headers);
-      console.info("[clearCart] body:", bodyObj);
-
-      const res = await fetch(`${API_BASE}/api/cart/clear`, {
-        method: "POST",
-        headers,
-        body: Object.keys(bodyObj).length ? JSON.stringify(bodyObj) : undefined,
-      });
-
-      const text = await res.text();
-      console.info("[clearCart] status:", res.status, "responseText:", text);
-
-      if (!res.ok) {
-        let parsed;
+        if (!authRaw) return null;
         try {
-          parsed = JSON.parse(text);
-        } catch (e) {
-          parsed = text;
+          const authObj = JSON.parse(authRaw);
+          return authObj?.token || authObj?.accessToken || null;
+        } catch {
+          return null;
         }
-        throw new Error(
-          `clearCart failed ${res.status}: ${JSON.stringify(parsed)}`
-        );
-      }
-
-      setItems([]);
-      if (sid) localStorage.removeItem("cart.sessionId");
-    } catch (err) {
-      console.error("clearCart error:", err);
-      throw err;
-    }
+      })()
+    );
   }
 
-  const totalItems = useMemo(
-    () => items.reduce((acc, it) => acc + (it.quantity || 0), 0),
-    [items]
-  );
+  // Fetch cart from backend
+  const fetchCart = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const sessionId = localStorage.getItem("cart.sessionId");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      let url = `${API_URL}/api/cart/items`;
+      if (sessionId) url += `?session_id=${encodeURIComponent(sessionId)}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error("No se pudo cargar el carrito");
+      const data = await res.json();
+      setItems(Array.isArray(data) ? data : data.items || []);
+    } catch (err) {
+      setError(err.message || "Error al cargar carrito");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const subtotal = useMemo(
-    () =>
-      items.reduce((acc, it) => acc + (it.price || 0) * (it.quantity || 0), 0),
-    [items]
-  );
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
-  const value = {
-    items,
-    addToCart,
-    updateQuantity,
-    removeFromCart,
-    clearCart,
-    totalItems,
-    subtotal,
-  };
+  // Add item to cart (backend)
+    const addToCart = async (productInput, qty = 1) => {
+      const p = normalizeProduct(productInput);
+      if (!p || !p.id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const token = getToken();
+        const sessionId = localStorage.getItem("cart.sessionId");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const body = {
+          producto_id: p.id,
+          quantity: Math.max(1, Math.min(qty, p.stock)),
+        };
+        if (sessionId) body.session_id = sessionId;
+        const res = await fetch(`${API_URL}/api/cart/items`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("No se pudo agregar al carrito");
+        await fetchCart();
+      } catch (err) {
+        setError(err.message || "Error al agregar al carrito");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+    // Update quantity (backend)
+    const updateQuantity = async (productId, qty) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = getToken();
+        const sessionId = localStorage.getItem("cart.sessionId");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const body = {
+          quantity: Math.max(1, Math.floor(qty || 1)),
+        };
+        if (sessionId) body.session_id = sessionId;
+        const res = await fetch(`${API_URL}/api/cart/items/${productId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("No se pudo actualizar cantidad");
+        await fetchCart();
+      } catch (err) {
+        setError(err.message || "Error al actualizar cantidad");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Remove from cart (backend)
+    const removeFromCart = async (productId) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = getToken();
+        const sessionId = localStorage.getItem("cart.sessionId");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        let url = `${API_URL}/api/cart/items/${productId}`;
+        if (sessionId) url += `?session_id=${encodeURIComponent(sessionId)}`;
+        const res = await fetch(url, {
+          method: "DELETE",
+          headers,
+        });
+        if (!res.ok) throw new Error("No se pudo quitar del carrito");
+        await fetchCart();
+      } catch (err) {
+        setError(err.message || "Error al quitar del carrito");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Clear cart (backend)
+    const clearCart = async (sessionId) => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (sessionId && typeof sessionId !== "string") {
+          if (sessionId?.nativeEvent || sessionId?.target) {
+            sessionId = undefined;
+          } else {
+            try {
+              sessionId = String(sessionId);
+            } catch {
+              sessionId = undefined;
+            }
+          }
+        }
+        const token = getToken();
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const sid = sessionId || localStorage.getItem("cart.sessionId");
+        const bodyObj = {};
+        if (sid) bodyObj.session_id = sid;
+        const res = await fetch(`${API_URL}/api/cart/clear`, {
+          method: "POST",
+          headers,
+          body: Object.keys(bodyObj).length ? JSON.stringify(bodyObj) : undefined,
+        });
+        if (!res.ok) throw new Error("No se pudo vaciar el carrito");
+        await fetchCart();
+        if (sid) localStorage.removeItem("cart.sessionId");
+      } catch (err) {
+        setError(err.message || "Error al vaciar carrito");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const totalItems = useMemo(
+      () => items.reduce((acc, it) => acc + (it.quantity || 0), 0),
+      [items]
+    );
+
+    const subtotal = useMemo(
+      () =>
+        items.reduce((acc, it) => acc + (it.price || 0) * (it.quantity || 0), 0),
+      [items]
+    );
+
+    const value = {
+      items,
+      addToCart,
+      updateQuantity,
+      removeFromCart,
+      clearCart,
+      totalItems,
+      subtotal,
+      loading,
+      error,
+      fetchCart,
+    };
+
+
+    return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {
