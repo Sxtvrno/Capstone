@@ -3026,7 +3026,7 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                     await conn.execute(
                         """
                         UPDATE pedido 
-                        SET order_status = 'pagado',
+                        SET order_status = 'Pagado',
                             notas = 'Pago autorizado por Transbank',
                             updated_at = NOW()
                         WHERE id = $1
