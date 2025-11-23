@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import { API_URL } from "../services/api";
 
 export const CartContext = createContext(null);
@@ -11,7 +18,9 @@ function normalizeProduct(raw) {
   // El precio unitario real
   const unit_price = Number(raw.unit_price ?? raw.price ?? raw.precio ?? 0);
   // El total del producto (unit_price * quantity) o total_price
-  const total_price = Number(raw.total_price ?? unit_price * (raw.quantity ?? 1));
+  const total_price = Number(
+    raw.total_price ?? unit_price * (raw.quantity ?? 1)
+  );
   const stock =
     raw.stock ??
     raw.stock_quantity ??
@@ -26,7 +35,16 @@ function normalizeProduct(raw) {
     raw.url ||
     null;
 
-  return { id, name, unit_price, total_price, stock, image, quantity: raw.quantity ?? 1, raw };
+  return {
+    id,
+    name,
+    unit_price,
+    total_price,
+    stock,
+    image,
+    quantity: raw.quantity ?? 1,
+    raw,
+  };
 }
 
 export function CartProvider({ children }) {
@@ -80,151 +98,164 @@ export function CartProvider({ children }) {
     fetchCart();
   }, [fetchCart]);
 
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (
+        e.key === "token" ||
+        e.key === "accessToken" ||
+        e.key === "authToken"
+      ) {
+        fetchCart();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [fetchCart]);
+
   // Add item to cart (backend)
-    const addToCart = async (productInput, qty = 1) => {
-      const p = normalizeProduct(productInput);
-      if (!p || !p.id) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const token = getToken();
-        const sessionId = localStorage.getItem("cart.sessionId");
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const body = {
-          producto_id: p.id,
-          quantity: Math.max(1, Math.min(qty, p.stock)),
-        };
-        if (sessionId) body.session_id = sessionId;
-        const res = await fetch(`${API_URL}/api/cart/items`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error("No se pudo agregar al carrito");
-        await fetchCart();
-      } catch (err) {
-        setError(err.message || "Error al agregar al carrito");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const addToCart = async (productInput, qty = 1) => {
+    const p = normalizeProduct(productInput);
+    if (!p || !p.id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const sessionId = localStorage.getItem("cart.sessionId");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const body = {
+        producto_id: p.id,
+        quantity: Math.max(1, Math.min(qty, p.stock)),
+      };
+      if (sessionId) body.session_id = sessionId;
+      const res = await fetch(`${API_URL}/api/cart/items`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("No se pudo agregar al carrito");
+      await fetchCart();
+    } catch (err) {
+      setError(err.message || "Error al agregar al carrito");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Update quantity (backend)
-    const updateQuantity = async (productId, qty) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = getToken();
-        const sessionId = localStorage.getItem("cart.sessionId");
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const body = {
-          quantity: Math.max(1, Math.floor(qty || 1)),
-        };
-        if (sessionId) body.session_id = sessionId;
-        const res = await fetch(`${API_URL}/api/cart/items/${productId}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error("No se pudo actualizar cantidad");
-        await fetchCart();
-      } catch (err) {
-        setError(err.message || "Error al actualizar cantidad");
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Update quantity (backend)
+  const updateQuantity = async (productId, qty) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const sessionId = localStorage.getItem("cart.sessionId");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const body = {
+        quantity: Math.max(1, Math.floor(qty || 1)),
+      };
+      if (sessionId) body.session_id = sessionId;
+      const res = await fetch(`${API_URL}/api/cart/items/${productId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("No se pudo actualizar cantidad");
+      await fetchCart();
+    } catch (err) {
+      setError(err.message || "Error al actualizar cantidad");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Remove from cart (backend)
-    const removeFromCart = async (productId) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = getToken();
-        const sessionId = localStorage.getItem("cart.sessionId");
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        let url = `${API_URL}/api/cart/items/${productId}`;
-        if (sessionId) url += `?session_id=${encodeURIComponent(sessionId)}`;
-        const res = await fetch(url, {
-          method: "DELETE",
-          headers,
-        });
-        if (!res.ok) throw new Error("No se pudo quitar del carrito");
-        await fetchCart();
-      } catch (err) {
-        setError(err.message || "Error al quitar del carrito");
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Remove from cart (backend)
+  const removeFromCart = async (productId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const sessionId = localStorage.getItem("cart.sessionId");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      let url = `${API_URL}/api/cart/items/${productId}`;
+      if (sessionId) url += `?session_id=${encodeURIComponent(sessionId)}`;
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) throw new Error("No se pudo quitar del carrito");
+      await fetchCart();
+    } catch (err) {
+      setError(err.message || "Error al quitar del carrito");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Clear cart (backend)
-    const clearCart = async (sessionId) => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (sessionId && typeof sessionId !== "string") {
-          if (sessionId?.nativeEvent || sessionId?.target) {
+  // Clear cart (backend)
+  const clearCart = async (sessionId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (sessionId && typeof sessionId !== "string") {
+        if (sessionId?.nativeEvent || sessionId?.target) {
+          sessionId = undefined;
+        } else {
+          try {
+            sessionId = String(sessionId);
+          } catch {
             sessionId = undefined;
-          } else {
-            try {
-              sessionId = String(sessionId);
-            } catch {
-              sessionId = undefined;
-            }
           }
         }
-        const token = getToken();
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const sid = sessionId || localStorage.getItem("cart.sessionId");
-        const bodyObj = {};
-        if (sid) bodyObj.session_id = sid;
-        const res = await fetch(`${API_URL}/api/cart/clear`, {
-          method: "POST",
-          headers,
-          body: Object.keys(bodyObj).length ? JSON.stringify(bodyObj) : undefined,
-        });
-        if (!res.ok) throw new Error("No se pudo vaciar el carrito");
-        await fetchCart();
-        if (sid) localStorage.removeItem("cart.sessionId");
-      } catch (err) {
-        setError(err.message || "Error al vaciar carrito");
-      } finally {
-        setLoading(false);
       }
-    };
+      const token = getToken();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const sid = sessionId || localStorage.getItem("cart.sessionId");
+      const bodyObj = {};
+      if (sid) bodyObj.session_id = sid;
+      const res = await fetch(`${API_URL}/api/cart/clear`, {
+        method: "POST",
+        headers,
+        body: Object.keys(bodyObj).length ? JSON.stringify(bodyObj) : undefined,
+      });
+      if (!res.ok) throw new Error("No se pudo vaciar el carrito");
+      await fetchCart();
+      if (sid) localStorage.removeItem("cart.sessionId");
+    } catch (err) {
+      setError(err.message || "Error al vaciar carrito");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const totalItems = useMemo(
+    () => items.reduce((acc, it) => acc + (it.quantity || 0), 0),
+    [items]
+  );
 
-    const totalItems = useMemo(
-      () => items.reduce((acc, it) => acc + (it.quantity || 0), 0),
-      [items]
-    );
+  // El subtotal debe sumar los total_price de cada item
+  const subtotal = useMemo(
+    () => items.reduce((acc, it) => acc + (it.total_price || 0), 0),
+    [items]
+  );
 
-    // El subtotal debe sumar los total_price de cada item
-    const subtotal = useMemo(
-      () => items.reduce((acc, it) => acc + (it.total_price || 0), 0),
-      [items]
-    );
+  const value = {
+    items,
+    addToCart,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    totalItems,
+    subtotal,
+    loading,
+    error,
+    fetchCart,
+  };
 
-    const value = {
-      items,
-      addToCart,
-      updateQuantity,
-      removeFromCart,
-      clearCart,
-      totalItems,
-      subtotal,
-      loading,
-      error,
-      fetchCart,
-    };
-
-
-    return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {

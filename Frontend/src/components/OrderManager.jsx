@@ -121,9 +121,6 @@ function OrderManager() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Gestión de Pedidos
         </h1>
-        <p className="text-gray-600">
-          Administra y actualiza el estado de los pedidos
-        </p>
       </div>
 
       {/* Filtros */}
