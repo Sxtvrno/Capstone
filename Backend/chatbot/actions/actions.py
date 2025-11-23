@@ -265,8 +265,8 @@ class ActionConsultarPedido(Action):
                     p.updated_at,
                     c.first_name,
                     c.email
-                FROM Pedido p
-                JOIN Cliente c ON p.cliente_id = c.id
+                FROM pedido p
+                JOIN cliente c ON p.cliente_id = c.id
                 WHERE p.id = $1
             """
             pedido = await conn.fetchrow(query, int(pedido_id))
@@ -276,10 +276,10 @@ class ActionConsultarPedido(Action):
                 productos_query = """
                     SELECT 
                         pr.title,
-                        dp.quantity,
-                        dp.unit_price
-                    FROM DetallePedido dp
-                    JOIN Producto pr ON dp.producto_id = pr.id
+                        dp.cantidad,
+                        dp.precio_unitario
+                    FROM detalle_pedido dp
+                    JOIN producto pr ON dp.producto_id = pr.id
                     WHERE dp.pedido_id = $1
                     ORDER BY pr.title
                     LIMIT 5
@@ -289,49 +289,57 @@ class ActionConsultarPedido(Action):
                 # Obtener información de pago si existe
                 pago_query = """
                     SELECT payment_status, payment_method, payment_date
-                    FROM Pago
+                    FROM pago
                     WHERE order_id = $1
                     ORDER BY payment_date DESC
                     LIMIT 1
                 """
                 pago = await conn.fetchrow(pago_query, int(pedido_id))
                 
-                # Formatear respuesta
+                # Formatear respuesta compacta y clara
                 estado = pedido['order_status']
                 total = pedido['total_price']
                 fecha = pedido['created_at'].strftime("%d/%m/%Y")
                 direccion = pedido['shipping_address']
-                
-                # Construir lista de productos
+
+                # Mapear estados a descripciones y emojis
+                estado_map = {
+                    'creado': '📝 Creado',
+                    'pagado': '💸 Pagado',
+                    'en_preparacion': '🛠️ En preparación',
+                    'listo_para_envio': '📦 Listo para envío',
+                    'enviado': '🚚 Enviado',
+                    'entregado': '🎉 Entregado',
+                    'cancelado': '❌ Cancelado',
+                }
+                estado_legible = estado_map.get(estado.lower().replace(' ', '_'), estado.capitalize())
+
+                # Productos
                 productos_texto = ""
                 if productos:
-                    productos_texto = "\n\n**Productos:**\n"
-                    for i, prod in enumerate(productos, 1):
-                        productos_texto += f"{i}. {prod['title']} (x{prod['quantity']}) - ${prod['unit_price']:,.0f}\n"
-                    
-                    total_productos = len(productos)
-                    if total_productos >= 5:
-                        productos_texto += "_(y más productos)_\n"
-                
-                # Información de pago
+                    productos_texto = "\n" + ", ".join([
+                        f"{prod['title']} (x{prod['cantidad']})"
+                        for prod in productos
+                    ])
+                else:
+                    productos_texto = "\n(Sin productos)"
+
+                # Pago
                 pago_texto = ""
                 if pago:
-                    pago_texto = f"\n**Estado de Pago:** {pago['payment_status']}"
+                    pago_texto = f" | Pago: {pago['payment_status']}"
                     if pago['payment_method']:
                         pago_texto += f" ({pago['payment_method']})"
-                
-                mensaje = f"""
-📦 **Estado de tu Pedido #{pedido_id}**
 
-**Estado:** {self.emoji_estado(estado)} {estado.upper().replace('_', ' ')}
-**Total:** ${total:,.0f}
-**Fecha de Pedido:** {fecha}{pago_texto}{productos_texto}
-**Dirección de envío:** {direccion}
-
-{self.mensaje_segun_estado(estado)}
-
-_¿Necesitas más información? Escribe 'ayuda' o habla con un agente._
-"""
+                # Mensaje final compacto
+                mensaje = (
+                    f"Pedido #{pedido_id}\n"
+                    f"Estado: {estado_legible}\n"
+                    f"Total: ${total:,.0f} | Fecha: {fecha}{pago_texto}\n"
+                    f"Productos:{productos_texto}\n"
+                    f"Fecha: {fecha}{pago_texto}\n"
+                    f"Envío: {direccion if direccion else 'No especificado'}"
+                )
                 dispatcher.utter_message(text=mensaje.strip())
             else:
                 dispatcher.utter_message(
@@ -353,27 +361,7 @@ _¿Necesitas más información? Escribe 'ayuda' o habla con un agente._
         match = re.search(r'\b\d{1,6}\b', text)
         return match.group(0) if match else None
     
-    def emoji_estado(self, estado: str) -> str:
-        """Devuelve emoji según el estado del pedido."""
-        emojis = {
-            'creado': '📝',
-            'en preparación': '📦',
-            'listo para retiro': '✅',
-            'entregado': '🎉',
-            'cancelado': '❌'
-        }
-        return emojis.get(estado.lower(), '📋')
-    
-    def mensaje_segun_estado(self, estado: str) -> str:
-        """Devuelve mensaje adicional según el estado del pedido."""
-        mensajes = {
-               'creado': '⏳ Tu pedido ha sido creado y está en proceso de validación de pago.',
-               'en preparación': '📦 ¡Tu pedido está siendo preparado! Pronto estará listo para que lo retires.',
-               'listo para retiro': '✅ ¡Tu pedido está listo! Puedes pasar a retirarlo en nuestra tienda.',
-               'entregado': '🎉 ¡Tu pedido ha sido entregado! Esperamos que lo disfrutes.',
-               'cancelado': '❌ Este pedido ha sido cancelado. Si tienes dudas, contacta a soporte.'
-        }
-        return mensajes.get(estado.lower(), '📞 Consulta con nuestro equipo para más detalles.')
+    # emoji_estado y mensaje_segun_estado ya no son necesarios con el nuevo formato
 
 
 # ==================== ACCIÓN: CREAR TICKET ====================
@@ -454,10 +442,6 @@ class ActionCrearTicket(Action):
                     )
                 except Exception as e:
                     logger.warning(f"No se pudo registrar interacción post-ticket: {e}")
-            
-            dispatcher.utter_message(
-                text=f"✅ Tu ticket #{ticket_id} ha sido creado. Un agente te contactará pronto."
-            )
         
         except Exception as e:
             logger.error(f"Error creando ticket: {e}")
