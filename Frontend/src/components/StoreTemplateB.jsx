@@ -75,11 +75,6 @@ export default function StoreTemplateB({
 
   return (
     <div>
-      <TemplateNavbar
-        storeName={storeName}
-        logo={logoProp}
-        headerColor={headerColor}
-      />
       <header
         style={{
           maxWidth: 1200,

@@ -22,9 +22,10 @@ function AdminPage({ user, onLogout }) {
     }
   }, [navigate]);
 
+  // En el botón de logout:
   const handleLogout = () => {
-    onLogout();
-    navigate("/");
+    localStorage.clear();
+    window.location.href = "/login";
   };
 
   // Mostrar información del usuario admin
@@ -54,7 +55,6 @@ function AdminPage({ user, onLogout }) {
                   {vista === "pedidos" && "Gestión de Pedidos"}
                   {vista === "tickets" && "Tickets de Soporte"}
                   {vista === "personaliza" && "Personalizar Tienda"}
-                  {vista === "pedidos" && "Gestión de Pedidos"}
                 </h1>
                 <p className="text-sm md:text-base text-gray-600">
                   {vista === "productos" &&

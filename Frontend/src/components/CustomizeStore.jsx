@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import TemplateGallery from "./TemplateGallery";
-import { getProductos } from "../services/api";
+import { getProductos, getStoreConfig } from "../services/api";
+import { updateStoreConfig } from "../services/api";
 
 // Descubre todas las plantillas StoreTemplate*.jsx
 function useStoreTemplates() {
@@ -46,11 +47,11 @@ const CustomizeStore = () => {
   const [products, setProducts] = useState([]);
   const [templateType, setTemplateType] = useState("grid");
   const [showModal, setShowModal] = useState(false);
-
   // Estado para el logo
-  const [logoPreview, setLogoPreview] = useState(
-    () => localStorage.getItem("logoPreview") || null
-  );
+  const [logoPreview, setLogoPreview] = useState(null);
+  // Nuevo: modal para editar logo por URL
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [tempLogoUrl, setTempLogoUrl] = useState("");
 
   // Estado para el color del header
   const [headerColor, setHeaderColor] = useState(
@@ -65,36 +66,49 @@ const CustomizeStore = () => {
   const SelectedTemplate = selectedKey ? map[selectedKey]?.Component : null;
 
   useEffect(() => {
+    // Cargar productos
     getProductos()
       .then((res) => {
         const data = res?.data ?? res ?? [];
         setProducts(data);
       })
       .catch((err) => console.error(err));
+
+    // Cargar config tienda
+    getStoreConfig()
+      .then((cfg) => {
+        setStoreName(cfg.store_name);
+        setLogoPreview(cfg.logo_url || null);
+        setHeaderColor(cfg.header_color || "#111827");
+      })
+      .catch(() => {});
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem("selectedTemplateKey", selectedKey || "");
-    localStorage.setItem("storeName", storeName);
-    localStorage.setItem("logoPreview", logoPreview || "");
-    localStorage.setItem("headerColor", headerColor);
-    setShowModal(true);
-    setTimeout(() => setShowModal(false), 2000);
-  };
+  const handleSave = async () => {
+    try {
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("authToken") ||
+        null;
 
-  const handleLogoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = reader.result;
-      setLogoPreview(dataUrl);
-    };
-    reader.readAsDataURL(file);
-  };
+      await updateStoreConfig(
+        {
+          store_name: storeName,
+          logo_url: logoPreview,
+          header_color: headerColor,
+        },
+        token
+      );
 
-  const handleLogoRemove = () => {
-    setLogoPreview(null);
+      setShowModal(true);
+      window.dispatchEvent(new Event("store-config-updated"));
+      setTimeout(() => setShowModal(false), 1800);
+    } catch (e) {
+      console.error(e);
+      setShowModal(true);
+      setTimeout(() => setShowModal(false), 2000);
+    }
   };
 
   return (
@@ -118,13 +132,6 @@ const CustomizeStore = () => {
                 className="h-10 w-10 md:h-12 md:w-12 rounded-lg object-cover border-2"
                 style={{ borderColor: headerTextColor + "40" }}
               />
-              <button
-                onClick={handleLogoRemove}
-                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                title="Quitar logo"
-              >
-                ✕
-              </button>
             </div>
           )}
 
@@ -155,37 +162,52 @@ const CustomizeStore = () => {
           )}
         </div>
 
-        {/* Controles - Ahora en columna en mobile */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:ml-auto">
-          <label
-            className="px-3 py-2 rounded-lg font-medium cursor-pointer hover:opacity-90 transition text-center text-sm whitespace-nowrap"
+        {/* Controles - reemplazados: ahora botón que abre popup para logo */}
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-3 sm:ml-auto w-full sm:w-auto">
+          {/* Botón Logo */}
+          <button
+            type="button"
+            onClick={() => {
+              setTempLogoUrl(logoPreview || "");
+              setShowLogoModal(true);
+            }}
+            className="px-4 py-3 rounded-xl shadow-sm border text-xs font-semibold tracking-wide uppercase transition w-full sm:w-48 flex items-center justify-center gap-2"
             style={{
               backgroundColor: headerTextColor,
               color: headerColor,
+              borderColor: headerColor + "30",
             }}
           >
-            {logoPreview ? "Cambiar Logo" : "Subir Logo"}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              className="hidden"
-            />
-          </label>
+            {logoPreview ? "Cambiar Logo" : "Agregar Logo"}
+            {logoPreview && (
+              <span className="inline-block h-6 w-6 rounded bg-white overflow-hidden">
+                <img
+                  src={logoPreview}
+                  alt="Logo"
+                  className="h-full w-full object-cover"
+                  onError={() => setLogoPreview(null)}
+                />
+              </span>
+            )}
+          </button>
 
+          {/* Color Picker */}
           <label
-            className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium cursor-pointer hover:opacity-90 transition text-sm whitespace-nowrap"
+            className="flex items-center gap-3 px-4 py-4 rounded-xl font-medium cursor-pointer shadow-sm border w-full sm:w-40 justify-between"
             style={{
               backgroundColor: headerTextColor,
               color: headerColor,
+              borderColor: headerColor + "30",
             }}
           >
-            <span>Color</span>
+            <span className="text-xs uppercase tracking-wide opacity-80">
+              Color Header
+            </span>
             <input
               type="color"
               value={headerColor}
               onChange={(e) => setHeaderColor(e.target.value)}
-              className="w-6 h-6 rounded border-0 cursor-pointer"
+              className="w-10 h-10 rounded-md border border-white/40 shadow cursor-pointer"
             />
           </label>
         </div>
@@ -276,6 +298,83 @@ const CustomizeStore = () => {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Logo URL */}
+      {showLogoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-5 md:p-6 relative animate-[slideUp_0.25s_ease]">
+            <h2 className="text-lg font-semibold mb-4">Logo por URL</h2>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="https://mi-logo.png"
+                value={tempLogoUrl}
+                onChange={(e) => setTempLogoUrl(e.target.value)}
+                className="w-full px-3 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500 truncate max-w-[60%]">
+                  {tempLogoUrl || "Sin URL"}
+                </div>
+                {tempLogoUrl && (
+                  <div className="h-12 w-12 rounded-lg overflow-hidden border bg-gray-50 flex items-center justify-center">
+                    <img
+                      src={tempLogoUrl}
+                      alt="Preview"
+                      className="h-full w-full object-cover"
+                      onError={() => setTempLogoUrl("")}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => {
+                  setShowLogoModal(false);
+                  setTempLogoUrl("");
+                }}
+                className="flex-1 px-3 py-2 rounded-md bg-gray-200 text-gray-700 text-sm hover:bg-gray-300 transition"
+              >
+                Cancelar
+              </button>
+              {logoPreview && (
+                <button
+                  onClick={() => {
+                    setLogoPreview(null);
+                    setTempLogoUrl("");
+                    setShowLogoModal(false);
+                  }}
+                  className="px-3 py-2 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition"
+                >
+                  Quitar
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setLogoPreview(tempLogoUrl.trim() || null);
+                  setShowLogoModal(false);
+                }}
+                disabled={!tempLogoUrl.trim()}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                  tempLogoUrl.trim()
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-green-200 text-green-700 cursor-not-allowed"
+                }`}
+              >
+                Guardar
+              </button>
+            </div>
+            <button
+              onClick={() => setShowLogoModal(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

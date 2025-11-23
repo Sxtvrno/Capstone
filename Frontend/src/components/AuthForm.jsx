@@ -37,6 +37,7 @@ const AuthForm = ({ onAuth }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
   // Validaciones
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -77,15 +78,17 @@ const AuthForm = ({ onAuth }) => {
     return ok;
   };
 
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
-    setSuccess("");
-
+    setLoading(true);
+    setError(null);
     try {
       if (isLogin) {
-        await login(username, password);
-        onAuth();
+        const { data } = await login(username, password);
+        localStorage.setItem("token", data.token);
+        // Guarda otros datos si corresponde
+        // Fuerza recarga completa (equivalente a Ctrl+R)
+        window.location.reload();
       } else {
         if (!validateRegisterFields()) return;
 
@@ -111,10 +114,12 @@ const AuthForm = ({ onAuth }) => {
         setPhone("");
         setAddress("");
       }
-    } catch {
-      setError("Error en la autenticación");
+    } catch (err) {
+      setError("Error de autenticación");
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   const handleEmailChange = (v) => {
     setEmail(v);
@@ -156,6 +161,12 @@ const AuthForm = ({ onAuth }) => {
       <span className="text-xs">{text}</span>
     </li>
   );
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    // ...borra otros datos...
+    window.location.reload();
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">

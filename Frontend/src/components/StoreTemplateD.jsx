@@ -75,11 +75,6 @@ export default function StoreTemplateD({
 
   return (
     <div>
-      <TemplateNavbar
-        storeName={storeName}
-        logo={logoProp}
-        headerColor={headerColor}
-      />
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: 16 }}>
         <h1 id="productos" style={{ margin: "12px 0" }}>
           Productos
