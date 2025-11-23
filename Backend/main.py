@@ -4044,68 +4044,6 @@ class OrderUpdateStatusRequest(BaseModel):
 class OrderNotasRequest(BaseModel):
     notas: str
 
-
-# Endpoint: Enviar mensaje al chatbot (proxy a Rasa)
-@app.post("/api/chatbot/message", response_model=List[ChatbotMessageResponse])
-async def chatbot_message(
-    request: ChatbotMessageRequest,
-    db=Depends(get_db),
-    current_user: Optional[dict] = Depends(get_current_user_optional),
-):
-    """
-    Envía un mensaje al chatbot Rasa y devuelve la respuesta.
-    """
-    import httpx
-    
-    sender_id = request.sender_id or str(datetime.now().timestamp())
-    rasa_url = os.getenv("RASA_URL", "http://localhost:5005/webhooks/rest/webhook")
-
-    # Construir metadata incluyendo cliente_id si el usuario está autenticado
-    metadata = request.metadata.copy() if request.metadata else {}
-    if current_user and current_user.get("role") == ROLE_CLIENTE:
-        metadata["cliente_id"] = current_user.get("id") or current_user.get("user_id")
-
-    payload = {
-        "sender": sender_id,
-        "message": request.message,
-        "metadata": metadata,
-    }
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(rasa_url, json=payload, timeout=10.0)
-            
-            if response.status_code == 200:
-                rasa_responses = response.json()
-                
-                # Formatear respuestas
-                chatbot_responses = []
-                for resp in rasa_responses:
-                    chatbot_responses.append(
-                        ChatbotMessageResponse(
-                            response=resp.get("text", ""),
-                            confidence=resp.get("confidence"),
-                            intent=resp.get("intent")
-                        )
-                    )
-                
-                return chatbot_responses
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Error comunicándose con Rasa"
-                )
-    
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="Timeout al conectar con el chatbot. Verifica que Rasa esté corriendo."
-        )
-    except Exception as e:
-        logger.error(f"Error en chatbot_message: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # Endpoint: Listar FAQs (Admin)
 @app.get("/api/admin/faqs", response_model=List[FAQResponse])
 async def list_faqs(
