@@ -48,6 +48,22 @@ function normalizeProduct(raw) {
 }
 
 export function CartProvider({ children }) {
+
+  // Generar session_id si no existe (solo para usuarios no autenticados)
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      let sessionId = localStorage.getItem("cart.sessionId");
+      if (!sessionId) {
+        // Generar un session_id simple (UUID v4-like)
+        sessionId = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+          (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+        );
+        localStorage.setItem("cart.sessionId", sessionId);
+      }
+    }
+  }, []);
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -223,7 +239,7 @@ export function CartProvider({ children }) {
       });
       if (!res.ok) throw new Error("No se pudo vaciar el carrito");
       await fetchCart();
-      if (sid) localStorage.removeItem("cart.sessionId");
+      // No eliminar el sessionId, así el usuario invitado puede seguir usando el carrito
     } catch (err) {
       setError(err.message || "Error al vaciar carrito");
     } finally {
