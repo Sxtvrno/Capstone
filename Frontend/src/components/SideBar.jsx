@@ -163,9 +163,8 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-200 transition-transform duration-300 ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-200 transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -195,11 +194,10 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
                   setVista(item.id);
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                  vista === item.id
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${vista === item.id
                     ? "bg-blue-50 text-blue-600 shadow-sm"
                     : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 {item.icon}
                 <span>{item.label}</span>
