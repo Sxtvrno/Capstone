@@ -17,7 +17,7 @@ import VerificationPage from "./pages/VerificationPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ChatWidget from "./components/ChatWidget";
-import { authAPI } from "./services/api";
+import { authAPI, getStoreConfig } from "./services/api";
 import { CartProvider } from "./contexts/CartContext";
 import PaymentReturn from "./pages/PaymentReturn";
 import OrdersPage from "./pages/OrdersPage";
@@ -41,29 +41,84 @@ function PublicLayout({ storeName, logo, headerColor }) {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [storeCfg, setStoreCfg] = useState({
+    store_name: "Mi Tienda",
+    logo_url: null,
+    header_color: "#111827",
+  });
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const init = async () => {
       try {
         if (authAPI?.isAuthenticated?.()) {
-          const currentUser = authAPI.getCurrentUser();
-          setUser(currentUser || null);
+          setUser(authAPI.getCurrentUser() || null);
         }
-      } catch (e) {
-        console.error("Error verificando autenticación:", e);
-        authAPI?.logout?.();
+        // cargar config tienda
+        try {
+          const cfg = await getStoreConfig();
+          setStoreCfg(cfg);
+        } catch {}
       } finally {
         setLoading(false);
       }
     };
-    checkAuth();
+    init();
   }, []);
 
-  const handleLogin = (userData) => setUser(userData);
-  const handleLogout = () => {
-    authAPI?.logout?.();
-    setUser(null);
+  useEffect(() => {
+    const onCfgUpdated = async () => {
+      try {
+        const cfg = await getStoreConfig();
+        setStoreCfg(cfg);
+      } catch {}
+    };
+    window.addEventListener("store-config-updated", onCfgUpdated);
+    return () =>
+      window.removeEventListener("store-config-updated", onCfgUpdated);
+  }, []);
+
+  // Recarga dura si cambia token en otra pestaña / login externo
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (["token", "accessToken", "authToken"].includes(e.key)) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    window.location.reload(); // fuerza estado limpio
   };
+
+  const handleLogout = () => {
+    try {
+      authAPI?.logout?.(); // si internamente no limpia, seguimos abajo
+    } catch {}
+    // Elimina todas las variantes posibles
+    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("auth");
+    // Si guardaste usuario en otro lado, elimínalo también
+    // Redirección dura (evita quedarse en /admin)
+    window.location.replace("/login");
+    // Opcional: si quieres además asegurar recarga total (normalmente replace ya recarga)
+    // setTimeout(() => window.location.reload(), 50);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!authAPI?.isAuthenticated?.()) {
+        if (user) {
+          window.location.replace("/login");
+        }
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (loading) {
     return (
@@ -76,10 +131,6 @@ function App() {
     );
   }
 
-  const storeName = localStorage.getItem("storeName") || "Mi Tienda";
-  const logo = localStorage.getItem("logoPreview") || null;
-  const headerColor = localStorage.getItem("headerColor") || "#111827";
-
   return (
     <CartProvider>
       <Router>
@@ -87,9 +138,9 @@ function App() {
           <Route
             element={
               <PublicLayout
-                storeName={storeName}
-                logo={logo}
-                headerColor={headerColor}
+                storeName={storeCfg.store_name}
+                logo={storeCfg.logo_url}
+                headerColor={storeCfg.header_color}
               />
             }
           >
