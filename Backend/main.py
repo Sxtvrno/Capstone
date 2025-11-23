@@ -685,6 +685,7 @@ async def get_current_admin(user: dict = Depends(get_current_user)):
 class CartAddItemRequest(BaseModel):
     producto_id: int
     quantity: int = 1
+    session_id: Optional[str] = None
 
 
 class CartUpdateItemRequest(BaseModel):
@@ -750,9 +751,8 @@ async def get_current_user_optional(
 async def get_or_create_cart(
     conn, *, cliente_id: Optional[int] = None, session_id: Optional[str] = None
 ):
-    if not cliente_id and not session_id:
-        raise HTTPException(status_code=400, detail="Se requiere cliente o session_id")
     if cliente_id:
+        # Si hay cliente_id, solo usar cliente_id (usuario autenticado)
         cart = await conn.fetchrow(
             "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
         )
@@ -761,7 +761,8 @@ async def get_or_create_cart(
                 "INSERT INTO Carrito (cliente_id) VALUES ($1) RETURNING id", cliente_id
             )
         return cart["id"]
-    else:
+    elif session_id:
+        # Si no hay cliente_id, usar session_id (usuario anónimo)
         cart = await conn.fetchrow(
             "SELECT id FROM Carrito WHERE session_id = $1", session_id
         )
@@ -770,6 +771,9 @@ async def get_or_create_cart(
                 "INSERT INTO Carrito (session_id) VALUES ($1) RETURNING id", session_id
             )
         return cart["id"]
+    else:
+        # Si no hay ninguno, error
+        raise HTTPException(status_code=400, detail="Se requiere session_id para carritos anónimos o cliente_id para autenticados")
 
 
 async def get_cart_summary(conn, cart_id: int) -> CartResponse:
@@ -893,10 +897,14 @@ async def add_item_cart(
     """
     Agregar un producto al carrito (o incrementar su cantidad).
     """
-    if not user and not session_id:
-        raise HTTPException(
-            status_code=400, detail="session_id requerido para carritos anónimos"
-        )
+    # Si no hay usuario, tomar session_id del payload si no viene por query
+    if not user:
+        if not session_id:
+            session_id = getattr(payload, "session_id", None)
+        if not session_id:
+            raise HTTPException(
+                status_code=400, detail="session_id requerido para carritos anónimos"
+            )
     if payload.quantity <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
 
@@ -1054,19 +1062,30 @@ async def remove_item_cart(
     return await get_cart_summary(conn, cart_id)
 
 
+from fastapi import Request
+
 @app.post("/api/cart/clear", response_model=CartResponse)
 async def clear_cart(
     session_id: Optional[str] = None,
     user: Optional[dict] = Depends(get_current_user_optional),
     conn=Depends(get_db),
+    request: Request = None,
 ):
     """
     Vaciar el carrito.
     """
-    if not user and not session_id:
-        raise HTTPException(
-            status_code=400, detail="session_id requerido para carritos anónimos"
-        )
+    # Si no hay usuario, tomar session_id del body si no viene por query
+    if not user:
+        if not session_id and request is not None:
+            try:
+                data = await request.json()
+                session_id = data.get("session_id")
+            except Exception:
+                pass
+        if not session_id:
+            raise HTTPException(
+                status_code=400, detail="session_id requerido para carritos anónimos"
+            )
 
     cart_id = await get_or_create_cart(
         conn,
@@ -4080,67 +4099,6 @@ class OrderUpdateStatusRequest(BaseModel):
 
 class OrderNotasRequest(BaseModel):
     notas: str
-
-
-# Endpoint: Enviar mensaje al chatbot (proxy a Rasa)
-@app.post("/api/chatbot/message", response_model=List[ChatbotMessageResponse])
-async def chatbot_message(
-    request: ChatbotMessageRequest,
-    db=Depends(get_db),
-    current_user: Optional[dict] = Depends(get_current_user_optional),
-):
-    """
-    Envía un mensaje al chatbot Rasa y devuelve la respuesta.
-    """
-    import httpx
-
-    sender_id = request.sender_id or str(datetime.now().timestamp())
-    rasa_url = os.getenv("RASA_URL", "http://localhost:5005/webhooks/rest/webhook")
-
-    # Construir metadata incluyendo cliente_id si el usuario está autenticado
-    metadata = request.metadata.copy() if request.metadata else {}
-    if current_user and current_user.get("role") == ROLE_CLIENTE:
-        metadata["cliente_id"] = current_user.get("id") or current_user.get("user_id")
-
-    payload = {
-        "sender": sender_id,
-        "message": request.message,
-        "metadata": metadata,
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(rasa_url, json=payload, timeout=10.0)
-
-            if response.status_code == 200:
-                rasa_responses = response.json()
-
-                # Formatear respuestas
-                chatbot_responses = []
-                for resp in rasa_responses:
-                    chatbot_responses.append(
-                        ChatbotMessageResponse(
-                            response=resp.get("text", ""),
-                            confidence=resp.get("confidence"),
-                            intent=resp.get("intent"),
-                        )
-                    )
-
-                return chatbot_responses
-            else:
-                raise HTTPException(
-                    status_code=500, detail="Error comunicándose con Rasa"
-                )
-
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="Timeout al conectar con el chatbot. Verifica que Rasa esté corriendo.",
-        )
-    except Exception as e:
-        logger.error(f"Error en chatbot_message: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # Endpoint: Listar FAQs (Admin)
 @app.get("/api/admin/faqs", response_model=List[FAQResponse])
