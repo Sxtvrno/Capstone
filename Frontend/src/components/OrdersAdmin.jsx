@@ -278,7 +278,7 @@ function OrdersAdmin() {
                             it.producto?.nombre ||
                             it.product?.name ||
                             it.name ||
-                            `Item ${idx + 1}`;
+                            it.title;
                           const qty = it.cantidad || it.qty || it.quantity || 1;
                           const unit =
                             it.precio_unitario ||
@@ -332,9 +332,11 @@ function OrdersAdmin() {
                             {p.items.map((it, idx) => {
                               const nombre =
                                 it.nombre ||
+                                it.producto?.title ||
                                 it.producto?.nombre ||
                                 it.product?.name ||
                                 it.name ||
+                                it.title ||
                                 `Item ${idx + 1}`;
                               const qty =
                                 it.cantidad || it.qty || it.quantity || 1;

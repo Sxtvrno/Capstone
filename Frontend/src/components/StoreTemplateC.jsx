@@ -105,11 +105,6 @@ export default function StoreTemplateC(props) {
 
   return (
     <div>
-      <TemplateNavbar
-        storeName={storeName}
-        logo={logoProp}
-        headerColor={headerColor}
-      />
       <main>
         <section style={list}>
           {products.map((p) => {

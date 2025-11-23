@@ -497,7 +497,10 @@ export const transbankAPI = {
     const body = { ...payload };
     if (sessionId) body.session_id = sessionId;
 
-    console.info("[transbankAPI.createTransaction] url:", `${API_BASE}/api/transbank/create`);
+    console.info(
+      "[transbankAPI.createTransaction] url:",
+      `${API_BASE}/api/transbank/create`
+    );
     console.info("[transbankAPI.createTransaction] headers:", headers);
     console.info("[transbankAPI.createTransaction] body:", body);
 
@@ -514,7 +517,8 @@ export const transbankAPI = {
       return data;
     } catch (e) {
       // respuesta no JSON o error parseando
-      if (!res.ok) throw new Error(`Transbank create failed ${res.status}: ${text}`);
+      if (!res.ok)
+        throw new Error(`Transbank create failed ${res.status}: ${text}`);
       return text;
     }
   },
@@ -772,3 +776,31 @@ export default {
   orderAPI,
   API_URL,
 };
+
+export async function getStoreConfig() {
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/api/public/store-config`
+  );
+  if (!res.ok) throw new Error("Error obteniendo configuración de tienda");
+  return await res.json();
+}
+
+export async function updateStoreConfig(cfg, token) {
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/api/admin/store-config`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        store_name: cfg.store_name,
+        logo_url: cfg.logo_url,
+        header_color: cfg.header_color,
+      }),
+    }
+  );
+  if (!res.ok) throw new Error("Error actualizando configuración");
+  return await res.json();
+}
