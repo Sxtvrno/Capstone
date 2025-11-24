@@ -773,7 +773,10 @@ async def get_or_create_cart(
         return cart["id"]
     else:
         # Si no hay ninguno, error
-        raise HTTPException(status_code=400, detail="Se requiere session_id para carritos anónimos o cliente_id para autenticados")
+        raise HTTPException(
+            status_code=400,
+            detail="Se requiere session_id para carritos anónimos o cliente_id para autenticados",
+        )
 
 
 async def get_cart_summary(conn, cart_id: int) -> CartResponse:
@@ -1063,6 +1066,7 @@ async def remove_item_cart(
 
 
 from fastapi import Request
+
 
 @app.post("/api/cart/clear", response_model=CartResponse)
 async def clear_cart(
@@ -1735,12 +1739,10 @@ async def send_boleta_email(
     conn=Depends(get_db),
 ):
     """
-    Enviar boleta (pedido) por correo al email del cliente (o to_email si se provee).
-    Solo admin o propietario del pedido pueden solicitar el envío.
+    Enviar boleta del pedido por correo (formato alineado con OrderManager / PaymentReturn).
     """
     try:
-        # Obtener pedido + cliente
-        pedido = await conn.fetchrow(
+        pedido_row = await conn.fetchrow(
             """
             SELECT p.id, p.cliente_id, p.order_status, p.shipping_address, p.total_price,
                    p.created_at, p.updated_at,
@@ -1751,12 +1753,11 @@ async def send_boleta_email(
             """,
             pedido_id,
         )
-        if not pedido:
+        if not pedido_row:
             raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        pedido = dict(pedido_row)
 
-        pedido = dict(pedido)
-
-        # Permisos: admin o propietario
+        # Permisos
         if (
             current_user.get("role") != ROLE_ADMIN
             and current_user.get("id") != pedido["cliente_id"]
@@ -1765,7 +1766,6 @@ async def send_boleta_email(
                 status_code=403, detail="No tienes permiso para enviar esta boleta"
             )
 
-        # Determinar destinatario
         to_email = (
             (payload.to_email or pedido.get("cliente_email"))
             if payload
@@ -1776,75 +1776,151 @@ async def send_boleta_email(
                 status_code=400, detail="No hay email disponible para enviar la boleta"
             )
 
-        # Obtener items (si se requiere)
+        # Items (detalles)
         items = []
         if not payload or payload.include_items:
             rows = await conn.fetch(
                 """
-                  SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
-                      p.title as product_name
-                  FROM detalle_pedido dp
-                  LEFT JOIN producto p ON p.id = dp.producto_id
-                  WHERE dp.pedido_id = $1
-                  ORDER BY dp.producto_id
+                SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                       p.title as product_name, p.sku
+                FROM detalle_pedido dp
+                LEFT JOIN producto p ON p.id = dp.producto_id
+                WHERE dp.pedido_id = $1
+                ORDER BY dp.producto_id
                 """,
                 pedido_id,
             )
             items = [dict(r) for r in rows]
 
-        # Construir HTML de la boleta
-        created_at = pedido.get("created_at")
-        created_str = (
-            created_at.strftime("%Y-%m-%d %H:%M:%S")
-            if isinstance(created_at, datetime)
-            else str(created_at)
-        )
+        # Helpers
+        def fmt_dt(d):
+            if isinstance(d, datetime):
+                return d.strftime("%Y-%m-%d %H:%M:%S")
+            return str(d) if d else "—"
 
-        html_lines = []
-        html_lines.append(f"<h2>Boleta / Pedido #{pedido['id']}</h2>")
-        html_lines.append(f"<p>Fecha: {created_str}</p>")
-        html_lines.append(
-            f"<p>Cliente: {pedido.get('cliente_first_name', '')} {pedido.get('cliente_last_name', '')} ({to_email})</p>"
-        )
-        html_lines.append(
-            f"<p>Dirección envío: {pedido.get('shipping_address', '—')}</p>"
-        )
-        html_lines.append(f"<p>Estado: {pedido.get('order_status', '—')}</p>")
-        html_lines.append("<hr/>")
+        def get_nombre_item(it, idx):
+            candidatos = [
+                it.get("product_name"),
+                it.get("title"),
+            ]
+            for c in candidatos:
+                if isinstance(c, str) and c.strip():
+                    return c.strip()
+            if it.get("producto_id"):
+                return f"Producto #{it['producto_id']}"
+            return f"Item {idx + 1}"
 
-        if items:
-            html_lines.append("<h3>Productos</h3>")
-            html_lines.append('<table border="1" cellpadding="6" cellspacing="0">')
-            html_lines.append(
-                "<thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th></tr></thead><tbody>"
-            )
-            for it in items:
-                name = it.get("product_name") or f"ID {it.get('producto_id')}"
-                qty = int(it.get("quantity") or 0)
-                unit = float(it.get("unit_price") or 0.0)
-                total = unit * qty
-                html_lines.append(
-                    f"<tr><td>{name}</td><td align='center'>{qty}</td><td align='right'>${unit:.2f}</td><td align='right'>${total:.2f}</td></tr>"
+        def badge_color(estado):
+            if not estado:
+                return "#6b7280"
+            e = estado.lower()
+            if "crea" in e:
+                return "#1d4ed8"
+            if "pend" in e:
+                return "#b45309"
+            if "prep" in e:
+                return "#4338ca"
+            if "env" in e or "ship" in e:
+                return "#6d28d9"
+            if "entreg" in e or "comp" in e or "pag" in e:
+                return "#047857"
+            if "canc" in e or "rech" in e:
+                return "#b91c1c"
+            return "#374151"
+
+        created_str = fmt_dt(pedido.get("created_at"))
+        estado = pedido.get("order_status", "—")
+        estado_color = badge_color(estado)
+        total_pedido = int(pedido.get("total_price") or 0)
+
+        # Calcular total items (desde detalles, más preciso si existen)
+        total_items_calc = int(
+            sum(
+                (
+                    float(it.get("precio_unitario") or it.get("unit_price") or 0.0)
+                    * int(it.get("cantidad") or it.get("quantity") or 0)
                 )
-            html_lines.append("</tbody></table>")
-            # calcular total seguro
-            total_calc = sum(
-                (float(it.get("unit_price") or 0.0) * int(it.get("quantity") or 0))
                 for it in items
             )
-            html_lines.append(
-                f"<p><strong>Total (items): ${total_calc:.2f}</strong></p>"
-            )
-
-        # Añadir total del pedido (campo pedido.total_price)
-        html_lines.append(
-            f"<p><strong>Total pedido registrado: ${float(pedido.get('total_price') or 0.0):.2f}</strong></p>"
+            if items
+            else total_pedido
         )
 
-        html_lines.append("<p>Gracias por su compra.</p>")
+        # HTML
+        html_lines = []
+        html_lines.append(
+            f"""
+            <div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+              <div style="padding:20px;background:#f9fafb">
+                <h2 style="margin:0 0 4px;font-size:20px;color:#111827">Boleta / Pedido #{pedido["id"]}</h2>
+                <span style="display:inline-block;padding:4px 10px;font-size:12px;border-radius:16px;background:{estado_color}20;color:{estado_color};font-weight:600;margin-bottom:10px">
+                  {estado}
+                </span>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Fecha:</strong> {created_str}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Cliente:</strong> {pedido.get("cliente_first_name", "")} {pedido.get("cliente_last_name", "")} ({to_email})</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Dirección envío:</strong> {pedido.get("shipping_address", "—")}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Total pedido:</strong> ${total_pedido:,}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Items:</strong> {len(items)}</p>
+              </div>
+            """
+        )
+
+        if items:
+            html_lines.append(
+                """
+                <div style="padding:4px 20px 16px;background:#ffffff">
+                  <h3 style="font-size:16px;margin:16px 0 8px;color:#111827">Productos</h3>
+                  <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                      <tr style="background:#f3f4f6">
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Producto</th>
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Cantidad</th>
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Unit.</th>
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                """
+            )
+            for idx, it in enumerate(items):
+                nombre = get_nombre_item(it, idx)
+                qty = int(it.get("cantidad") or it.get("quantity") or 0)
+                unit = int(it.get("precio_unitario") or it.get("unit_price") or 0)
+                sub = unit * qty
+                html_lines.append(
+                    f"""
+                      <tr>
+                        <td style="padding:8px;border:1px solid #e5e7eb">{nombre}</td>
+                        <td style="padding:8px;border:1px solid #e5e7eb">{qty}</td>
+                        <td style="padding:8px;border:1px solid #e5e7eb">${unit:,}</td>
+                        <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600">${sub:,}</td>
+                      </tr>
+                    """
+                )
+            html_lines.append(
+                f"""
+                    </tbody>
+                  </table>
+                  <p style="margin:12px 0 0;font-size:13px;color:#374151">
+                    <strong>Total (items calculado):</strong> ${total_items_calc:,}
+                  </p>
+                  <p style="margin:4px 0 0;font-size:13px;color:#374151">
+                    <strong>Total pedido registrado:</strong> ${total_pedido:,}
+                  </p>
+                </div>
+                """
+            )
+
+        html_lines.append(
+            """
+              <div style="padding:16px 20px;background:#f9fafb">
+                <p style="margin:0;font-size:12px;color:#6b7280">Gracias por su compra.</p>
+              </div>
+            </div>
+            """
+        )
 
         html_body = "<html><body>" + "".join(html_lines) + "</body></html>"
-
         subject = f"Boleta Pedido #{pedido['id']}"
 
         sent = await email_service.send_email(
@@ -3408,6 +3484,7 @@ async def chatbot_message(
 
     sender_id = request.sender_id or str(datetime.now().timestamp())
     import socket
+
     def is_localhost_available():
         try:
             sock = socket.create_connection(("localhost", 5005), timeout=1)
@@ -4112,6 +4189,7 @@ class OrderUpdateStatusRequest(BaseModel):
 
 class OrderNotasRequest(BaseModel):
     notas: str
+
 
 # Endpoint: Listar FAQs (Admin)
 @app.get("/api/admin/faqs", response_model=List[FAQResponse])

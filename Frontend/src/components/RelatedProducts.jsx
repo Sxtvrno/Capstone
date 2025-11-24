@@ -72,7 +72,13 @@ const RelatedProducts = ({ currentProductId, categoryId, categoryName }) => {
         const results = await Promise.all(
           missing.map(async (id) => {
             try {
-              const imgs = await productAPI.getImages(id);
+              // Intentar endpoint público primero
+              let imgs;
+              try {
+                imgs = await productAPI.getImagesPublic(id);
+              } catch {
+                imgs = await productAPI.getImages(id);
+              }
               const urls = Array.isArray(imgs)
                 ? imgs.map((it) => it.url_imagen || it.url).filter(Boolean)
                 : [];
@@ -102,7 +108,7 @@ const RelatedProducts = ({ currentProductId, categoryId, categoryName }) => {
     return () => {
       isMounted = false;
     };
-  }, [relatedProducts.length]);
+  }, [relatedProducts]);
 
   const handleProductClick = (productId) => {
     navigate(`/product/${productId}`);
@@ -146,6 +152,7 @@ const RelatedProducts = ({ currentProductId, categoryId, categoryName }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {relatedProducts.map((product) => {
             const imageUrl = imagesMap[product.id]?.[0];
+            const hasImage = imageUrl && imageUrl.trim() !== "";
 
             return (
               <article
@@ -155,7 +162,7 @@ const RelatedProducts = ({ currentProductId, categoryId, categoryName }) => {
               >
                 {/* Imagen */}
                 <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
-                  {imageUrl ? (
+                  {hasImage ? (
                     <img
                       src={imageUrl}
                       alt={product.title || product.name}
@@ -163,13 +170,17 @@ const RelatedProducts = ({ currentProductId, categoryId, categoryName }) => {
                       loading="lazy"
                       onError={(e) => {
                         e.target.style.display = "none";
-                        e.target.nextElementSibling.style.display = "flex";
+                        const placeholder =
+                          e.target.parentElement.querySelector(
+                            ".image-placeholder"
+                          );
+                        if (placeholder) placeholder.style.display = "flex";
                       }}
                     />
                   ) : null}
                   <div
-                    className="w-full h-full flex items-center justify-center text-gray-400"
-                    style={{ display: imageUrl ? "none" : "flex" }}
+                    className="image-placeholder absolute inset-0 w-full h-full flex items-center justify-center text-gray-400"
+                    style={{ display: hasImage ? "none" : "flex" }}
                   >
                     <svg
                       className="w-16 h-16"
@@ -226,27 +237,29 @@ const RelatedProducts = ({ currentProductId, categoryId, categoryName }) => {
         </div>
 
         {/* Ver más productos de la categoría */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => navigate(`/search?category=${categoryId}`)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            Ver todos los productos de {categoryName}
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {categoryName && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => navigate(`/search?category=${categoryId}`)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </button>
-        </div>
+              Ver todos los productos de {categoryName}
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

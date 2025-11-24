@@ -3,7 +3,6 @@ import TemplateGallery from "./TemplateGallery";
 import { getProductos, getStoreConfig } from "../services/api";
 import { updateStoreConfig } from "../services/api";
 
-// Descubre todas las plantillas StoreTemplate*.jsx
 function useStoreTemplates() {
   const mods = import.meta.glob("./StoreTemplate*.jsx", { eager: true });
   const list = Object.entries(mods)
@@ -21,7 +20,6 @@ function useStoreTemplates() {
   return { list, map };
 }
 
-// Utilidad para asegurar contraste legible en el header
 function getContrastColor(hex) {
   try {
     const rgb = parseInt(hex.slice(1), 16);
@@ -40,20 +38,15 @@ const CustomizeStore = () => {
   const [selectedKey, setSelectedKey] = useState(
     () => localStorage.getItem("selectedTemplateKey") || list[0]?.key || null
   );
-  const [storeName, setStoreName] = useState(
-    () => localStorage.getItem("storeName") || "Mi Tienda"
+  const [storeName, setStoreName] = useState(() =>
+    localStorage.getItem("storeName")
   );
   const [editingName, setEditingName] = useState(false);
   const [products, setProducts] = useState([]);
-  const [templateType, setTemplateType] = useState("grid");
   const [showModal, setShowModal] = useState(false);
-  // Estado para el logo
   const [logoPreview, setLogoPreview] = useState(null);
-  // Nuevo: modal para editar logo por URL
   const [showLogoModal, setShowLogoModal] = useState(false);
   const [tempLogoUrl, setTempLogoUrl] = useState("");
-
-  // Estado para el color del header
   const [headerColor, setHeaderColor] = useState(
     () => localStorage.getItem("headerColor") || "#111827"
   );
@@ -66,7 +59,6 @@ const CustomizeStore = () => {
   const SelectedTemplate = selectedKey ? map[selectedKey]?.Component : null;
 
   useEffect(() => {
-    // Cargar productos
     getProductos()
       .then((res) => {
         const data = res?.data ?? res ?? [];
@@ -74,7 +66,6 @@ const CustomizeStore = () => {
       })
       .catch((err) => console.error(err));
 
-    // Cargar config tienda
     getStoreConfig()
       .then((cfg) => {
         setStoreName(cfg.store_name);
@@ -112,122 +103,115 @@ const CustomizeStore = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-      {/* Header - Ahora con mejor responsive */}
+    <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+      {/* Header compacto */}
       <header
-        className="w-full flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8 rounded-xl shadow-sm px-4 py-3 md:px-6 md:py-4 border"
+        className="w-full mb-6 rounded-xl shadow-md px-4 py-3 md:px-6 md:py-4 border-2"
         style={{
           backgroundColor: headerColor,
           color: headerTextColor,
           borderColor: headerTextColor + "40",
         }}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 min-w-0">
-          {logoPreview && (
-            <div className="relative flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          {/* Logo y nombre */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {logoPreview && (
               <img
                 src={logoPreview}
                 alt="Logo"
-                className="h-10 w-10 md:h-12 md:w-12 rounded-lg object-cover border-2"
+                className="h-10 w-10 md:h-12 md:w-12 rounded-lg object-cover border-2 flex-shrink-0"
                 style={{ borderColor: headerTextColor + "40" }}
               />
-            </div>
-          )}
-
-          {/* Nombre de tienda editable */}
-          {editingName ? (
-            <input
-              type="text"
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              onBlur={() => setEditingName(false)}
-              onKeyDown={(e) => e.key === "Enter" && setEditingName(false)}
-              autoFocus
-              className="text-lg md:text-xl font-bold px-2 py-1 rounded border-2 min-w-0 flex-1"
-              style={{
-                backgroundColor: headerColor,
-                color: headerTextColor,
-                borderColor: headerTextColor,
-              }}
-            />
-          ) : (
-            <h1
-              className="text-lg md:text-xl font-bold cursor-pointer hover:opacity-80 truncate"
-              onClick={() => setEditingName(true)}
-              title="Click para editar"
-            >
-              {storeName}
-            </h1>
-          )}
-        </div>
-
-        {/* Controles - reemplazados: ahora botón que abre popup para logo */}
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-3 sm:ml-auto w-full sm:w-auto">
-          {/* Botón Logo */}
-          <button
-            type="button"
-            onClick={() => {
-              setTempLogoUrl(logoPreview || "");
-              setShowLogoModal(true);
-            }}
-            className="px-4 py-3 rounded-xl shadow-sm border text-xs font-semibold tracking-wide uppercase transition w-full sm:w-48 flex items-center justify-center gap-2"
-            style={{
-              backgroundColor: headerTextColor,
-              color: headerColor,
-              borderColor: headerColor + "30",
-            }}
-          >
-            {logoPreview ? "Cambiar Logo" : "Agregar Logo"}
-            {logoPreview && (
-              <span className="inline-block h-6 w-6 rounded bg-white overflow-hidden">
-                <img
-                  src={logoPreview}
-                  alt="Logo"
-                  className="h-full w-full object-cover"
-                  onError={() => setLogoPreview(null)}
-                />
-              </span>
             )}
-          </button>
 
-          {/* Color Picker */}
-          <label
-            className="flex items-center gap-3 px-4 py-4 rounded-xl font-medium cursor-pointer shadow-sm border w-full sm:w-40 justify-between"
-            style={{
-              backgroundColor: headerTextColor,
-              color: headerColor,
-              borderColor: headerColor + "30",
-            }}
-          >
-            <span className="text-xs uppercase tracking-wide opacity-80">
-              Color Header
-            </span>
-            <input
-              type="color"
-              value={headerColor}
-              onChange={(e) => setHeaderColor(e.target.value)}
-              className="w-10 h-10 rounded-md border border-white/40 shadow cursor-pointer"
-            />
-          </label>
+            {editingName ? (
+              <input
+                type="text"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                onBlur={() => setEditingName(false)}
+                onKeyDown={(e) => e.key === "Enter" && setEditingName(false)}
+                autoFocus
+                className="text-lg md:text-xl font-bold px-2 py-1 rounded border-2 min-w-0 flex-1"
+                style={{
+                  backgroundColor: headerColor,
+                  color: headerTextColor,
+                  borderColor: headerTextColor,
+                }}
+              />
+            ) : (
+              <h1
+                className="text-lg md:text-xl font-bold cursor-pointer hover:opacity-80 truncate"
+                onClick={() => setEditingName(true)}
+                title="Click para editar"
+              >
+                {storeName}
+              </h1>
+            )}
+          </div>
+
+          {/* Controles compactos */}
+          <div className="flex gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setTempLogoUrl(logoPreview || "");
+                setShowLogoModal(true);
+              }}
+              className="px-3 py-2 rounded-lg shadow-sm border text-xs font-semibold uppercase transition hover:scale-105 flex items-center gap-2"
+              style={{
+                backgroundColor: headerTextColor,
+                color: headerColor,
+                borderColor: headerColor + "30",
+              }}
+            >
+              {logoPreview ? (
+                <>
+                  <span className="hidden sm:inline">Cambiar Logo</span>
+                  <span className="sm:hidden">Logo</span>
+                  <span className="inline-block h-5 w-5 rounded overflow-hidden border">
+                    <img
+                      src={logoPreview}
+                      alt="Logo"
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                </>
+              ) : (
+                "Agregar Logo"
+              )}
+            </button>
+
+            <label
+              className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium cursor-pointer shadow-sm border hover:scale-105 transition"
+              style={{
+                backgroundColor: headerTextColor,
+                color: headerColor,
+                borderColor: headerColor + "30",
+              }}
+            >
+              <span className="text-xs uppercase tracking-wide hidden sm:inline">
+                Color
+              </span>
+              <input
+                type="color"
+                value={headerColor}
+                onChange={(e) => setHeaderColor(e.target.value)}
+                className="w-8 h-8 rounded-md border cursor-pointer"
+              />
+            </label>
+          </div>
         </div>
       </header>
 
-      <p className="text-gray-700 text-sm md:text-base mb-4 px-2">
-        Aquí podrás cambiar el nombre, logo, colores y otros detalles visuales
-        de tu tienda online.
-      </p>
-
-      {/* Zona de plantillas - Mejorado para resoluciones pequeñas */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
-        {/* Panel de galería */}
-        <aside className="flex flex-col gap-3 md:gap-4 order-2 xl:order-1">
-          <h3 className="text-base md:text-lg text-gray-800 font-semibold px-2">
-            Elige una plantilla
-          </h3>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+      {/* Layout principal: Sidebar compacto + Vista previa grande */}
+      <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
+        {/* Sidebar de controles */}
+        <aside className="lg:w-80 xl:w-96 flex flex-col gap-4 order-2 lg:order-1">
+          {/* Dropdown de plantillas */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
             <TemplateGallery
-              templates={list}
               selectedKey={selectedKey}
               onSelect={(key) => {
                 setSelectedKey(key);
@@ -235,29 +219,86 @@ const CustomizeStore = () => {
               }}
             />
           </div>
+
+          {/* Instrucciones */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <svg
+                className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <div className="text-sm text-blue-900">
+                <p className="font-semibold mb-1">Personaliza tu tienda</p>
+                <ul className="space-y-1 text-blue-800 text-xs">
+                  <li>• Selecciona una plantilla</li>
+                  <li>• Edita el nombre haciendo click</li>
+                  <li>• Agrega tu logo por URL</li>
+                  <li>• Elige el color del header</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón guardar */}
+          <button
+            className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-green-700 text-white font-bold shadow-lg hover:shadow-xl hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-[1.02] active:scale-[0.98] text-sm md:text-base"
+            onClick={handleSave}
+          >
+            💾 Guardar Cambios
+          </button>
         </aside>
 
-        {/* Panel de vista previa */}
-        <main className="flex flex-col gap-3 md:gap-4 order-1 xl:order-2">
-          <h3 className="text-base md:text-lg text-gray-800 font-semibold px-2">
-            Vista previa
-          </h3>
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-auto">
-              {SelectedTemplate ? (
-                <div className="transform scale-90 md:scale-95 lg:scale-100 origin-top-left">
-                  <SelectedTemplate
-                    key={selectedKey}
-                    storeName={storeName}
-                    logo={logoPreview}
-                    headerColor={headerColor}
-                    products={products}
-                  />
+        {/* Vista previa expandida */}
+        <main className="flex-1 order-1 lg:order-2">
+          <div className="bg-white border-2 border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-100 to-gray-200 px-4 py-2 border-b-2 border-gray-300">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                  <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
                 </div>
+                <span className="text-xs font-mono text-gray-600 ml-3">
+                  Vista previa en vivo
+                </span>
+              </div>
+            </div>
+            <div className="w-full h-[500px] md:h-[600px] lg:h-[700px] xl:h-[800px] overflow-auto bg-gray-50">
+              {SelectedTemplate ? (
+                <SelectedTemplate
+                  key={selectedKey}
+                  storeName={storeName}
+                  logo={logoPreview}
+                  headerColor={headerColor}
+                  products={products}
+                />
               ) : (
-                <div className="p-4 md:p-8 text-gray-500 text-center">
-                  Selecciona una plantilla en la galería para ver la vista
-                  previa.
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center p-8">
+                    <svg
+                      className="w-20 h-20 mx-auto text-gray-300 mb-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+                      />
+                    </svg>
+                    <p className="text-gray-500 text-lg font-medium">
+                      Selecciona una plantilla para ver la vista previa
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -265,36 +306,30 @@ const CustomizeStore = () => {
         </main>
       </div>
 
-      {/* Botón Guardar - Ahora fixed en mobile, absoluto en desktop */}
-      <div className="fixed xl:absolute right-4 bottom-4 z-50">
-        <button
-          className="px-4 py-2.5 md:px-6 md:py-3 rounded-lg bg-green-600 text-white font-semibold shadow-lg hover:bg-green-700 transition text-sm md:text-base"
-          onClick={handleSave}
-        >
-          💾 Guardar Cambios
-        </button>
-      </div>
-
-      {/* Modal de confirmación - Mejorado responsive */}
+      {/* Modal de confirmación */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-4 md:p-6 max-w-sm w-full animate-[slideUp_0.3s_ease-out]">
-            <div className="flex items-center gap-3 text-green-600">
-              <svg
-                className="w-8 h-8 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-scale-in">
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-green-600"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
               <div>
-                <h3 className="font-bold text-base md:text-lg">¡Guardado!</h3>
+                <h3 className="font-bold text-lg text-gray-900">
+                  ¡Guardado exitoso!
+                </h3>
                 <p className="text-sm text-gray-600">
-                  Cambios aplicados correctamente
+                  Los cambios se aplicaron correctamente
                 </p>
               </div>
             </div>
@@ -304,40 +339,49 @@ const CustomizeStore = () => {
 
       {/* Modal Logo URL */}
       {showLogoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-5 md:p-6 relative animate-[slideUp_0.25s_ease]">
-            <h2 className="text-lg font-semibold mb-4">Logo por URL</h2>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="https://mi-logo.png"
-                value={tempLogoUrl}
-                onChange={(e) => setTempLogoUrl(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500 truncate max-w-[60%]">
-                  {tempLogoUrl || "Sin URL"}
-                </div>
-                {tempLogoUrl && (
-                  <div className="h-12 w-12 rounded-lg overflow-hidden border bg-gray-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative animate-scale-in">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">
+              Configurar Logo
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  URL de la imagen
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://ejemplo.com/mi-logo.png"
+                  value={tempLogoUrl}
+                  onChange={(e) => setTempLogoUrl(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              {tempLogoUrl && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <span className="text-xs text-gray-600 flex-1 truncate">
+                    Vista previa:
+                  </span>
+                  <div className="h-16 w-16 rounded-lg overflow-hidden border-2 border-gray-300 bg-white flex items-center justify-center">
                     <img
                       src={tempLogoUrl}
                       alt="Preview"
                       className="h-full w-full object-cover"
-                      onError={() => setTempLogoUrl("")}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
                     />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2 mt-5">
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
                   setShowLogoModal(false);
                   setTempLogoUrl("");
                 }}
-                className="flex-1 px-3 py-2 rounded-md bg-gray-200 text-gray-700 text-sm hover:bg-gray-300 transition"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition"
               >
                 Cancelar
               </button>
@@ -348,7 +392,7 @@ const CustomizeStore = () => {
                     setTempLogoUrl("");
                     setShowLogoModal(false);
                   }}
-                  className="px-3 py-2 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 transition"
+                  className="px-4 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition"
                 >
                   Quitar
                 </button>
@@ -359,30 +403,52 @@ const CustomizeStore = () => {
                   setShowLogoModal(false);
                 }}
                 disabled={!tempLogoUrl.trim()}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                className={`px-4 py-2.5 rounded-lg font-medium transition ${
                   tempLogoUrl.trim()
                     ? "bg-green-600 text-white hover:bg-green-700"
-                    : "bg-green-200 text-green-700 cursor-not-allowed"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
-                Guardar
+                Aplicar
               </button>
             </div>
             <button
               onClick={() => setShowLogoModal(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
               aria-label="Cerrar"
             >
-              ✕
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             </button>
           </div>
         </div>
       )}
 
       <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+        .animate-scale-in {
+          animation: scale-in 0.25s ease-out;
         }
       `}</style>
     </div>
