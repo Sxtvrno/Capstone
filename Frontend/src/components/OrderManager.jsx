@@ -271,8 +271,8 @@ function OrderManager({ isAdmin: propIsAdmin = null }) {
       {toast && (
         <div
           className={`rounded-lg px-4 py-3 text-sm shadow-sm flex items-start gap-2 max-w-md ${toast.type === "success"
-            ? "bg-green-50 border border-green-200 text-green-700"
-            : "bg-red-50 border border-red-200 text-red-700"
+              ? "bg-green-50 border border-green-200 text-green-700"
+              : "bg-red-50 border border-red-200 text-red-700"
             }`}
         >
           <span className="font-medium">
@@ -536,16 +536,14 @@ function OrderManager({ isAdmin: propIsAdmin = null }) {
                         </div>
                       </div>
                     )}
-
-                  </div >
-                )
-                }
-              </div >
+                  </div>
+                )}
+              </div>
             );
           })}
-        </div >
+        </div>
       )}
-    </div >
+    </div>
   );
 }
 
