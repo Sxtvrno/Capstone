@@ -86,7 +86,6 @@ async def get_db_connection():
         logger.error(f"Error conectando a la base de datos: {e}")
         return None
 
-
 # ==================== ACCIÓN: BUSCAR FAQ ====================
 
 class ActionBuscarFAQ(Action):
