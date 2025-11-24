@@ -177,7 +177,9 @@ const ProductDetailPage = () => {
     <>
       <ProductDetail
         product={productWithImages}
-        onAddToCart={() => addToCart(productWithImages, 1)}
+        onAddToCart={(productWithImages, qty) =>
+          addToCart(productWithImages, qty)
+        }
       />
 
       <div className="max-w-7xl mx-auto px-4 py-6"></div>

@@ -1,10 +1,8 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
-import { transbankAPI, authAPI } from "../services/api";
+import { transbankAPI, authAPI, productAPI } from "../services/api";
 
-
-// SessionId is still needed for anonymous carts, but CartContext now manages all cart state from backend
 function ensureSessionId() {
   let sid = localStorage.getItem("cart.sessionId");
   if (!sid) {
@@ -27,7 +25,6 @@ function postToWebpay(url, token) {
   form.submit();
 }
 
-
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const {
@@ -43,12 +40,71 @@ export default function CheckoutPage() {
   } = useCart();
   const [loadingPay, setLoadingPay] = useState(false);
   const [error, setError] = useState("");
+  const [imagesMap, setImagesMap] = useState({});
 
-  // Always fetch cart on mount to ensure up-to-date
   useEffect(() => {
     fetchCart();
     // eslint-disable-next-line
   }, []);
+
+  // Cargar imágenes de productos en el carrito
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadImages = async () => {
+      if (!items || items.length === 0) return;
+
+      const ids = [
+        ...new Set(
+          items
+            .map((it) => it.id ?? it.producto_id ?? it.productId)
+            .filter(Boolean)
+        ),
+      ];
+      const missing = ids.filter((id) => !imagesMap[id]);
+
+      if (missing.length === 0) return;
+
+      try {
+        const results = await Promise.all(
+          missing.map(async (id) => {
+            try {
+              let imgs;
+              try {
+                imgs = await productAPI.getImagesPublic(id);
+              } catch {
+                imgs = await productAPI.getImages(id);
+              }
+              const urls = Array.isArray(imgs)
+                ? imgs.map((it) => it.url_imagen || it.url).filter(Boolean)
+                : [];
+              return [id, urls];
+            } catch {
+              return [id, []];
+            }
+          })
+        );
+
+        if (isMounted) {
+          setImagesMap((prev) => {
+            const next = { ...prev };
+            for (const [id, urls] of results) {
+              next[id] = urls;
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        console.error("Error loading cart images:", err);
+      }
+    };
+
+    loadImages();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [items]);
 
   const requiresLogin = useMemo(() => {
     try {
@@ -97,6 +153,7 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
   if (!items || items.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16">
@@ -177,50 +234,105 @@ export default function CheckoutPage() {
 
           <ul className="space-y-4">
             {items.map((it, idx) => {
-              // Robust id fallback for key and actions
-              const productId = it.id ?? it.producto_id ?? it.productId ?? (it.raw && (it.raw.id ?? it.raw.producto_id ?? it.raw.productId)) ?? idx;
+              const productId =
+                it.id ??
+                it.producto_id ??
+                it.productId ??
+                (it.raw &&
+                  (it.raw.id ?? it.raw.producto_id ?? it.raw.productId)) ??
+                idx;
+
+              const itemName =
+                it.name ||
+                it.title ||
+                it.nombre ||
+                (it.raw && (it.raw.title || it.raw.nombre || it.raw.name)) ||
+                `Producto ${productId}`;
+
+              const unitPrice = it.unit_price ?? it.price ?? 0;
+              const qty = it.quantity ?? 1;
+              const totalPrice = it.total_price ?? unitPrice * qty;
+
+              // Usar imagen del mapa o fallback a it.image
+              const imageUrl = productId ? imagesMap[productId]?.[0] : null;
+              const hasImage = imageUrl || it.image;
+
               return (
                 <li
                   key={productId}
                   className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border">
-                      <img
-                        src={it.image || "/no-image.png"}
-                        alt={it.name}
-                        className="h-full w-full object-cover"
-                        onError={(e) =>
-                          (e.currentTarget.style.visibility = "hidden")
-                        }
-                      />
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border bg-gray-100">
+                      {hasImage ? (
+                        <img
+                          src={imageUrl || it.image}
+                          alt={itemName}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                            const placeholder =
+                              e.currentTarget.parentElement.querySelector(
+                                ".image-placeholder"
+                              );
+                            if (placeholder) placeholder.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className="image-placeholder absolute inset-0 flex items-center justify-center text-gray-400"
+                        style={{ display: hasImage ? "none" : "flex" }}
+                      >
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
                           <h3 className="text-base font-medium text-gray-900">
-                            {it.name || it.title || it.nombre || (it.raw && (it.raw.title || it.raw.nombre || it.raw.name)) || `Producto ${it.id}`}
+                            {itemName}
                           </h3>
                           <p className="mt-1 text-sm text-gray-500">
-                            {`${(it.unit_price ?? it.price ?? 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 })} c/u`}
+                            {unitPrice.toLocaleString("es-CL", {
+                              style: "currency",
+                              currency: "CLP",
+                              minimumFractionDigits: 0,
+                            })}{" "}
+                            c/u
                           </p>
                         </div>
                         <div className="text-right text-base font-semibold text-gray-900">
-                          { (it.total_price ?? (it.unit_price ?? it.price ?? 0) * (it.quantity ?? 1)).toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }) }
+                          {totalPrice.toLocaleString("es-CL", {
+                            style: "currency",
+                            currency: "CLP",
+                            minimumFractionDigits: 0,
+                          })}
                         </div>
                       </div>
                       <div className="mt-3 flex items-center justify-between">
                         <div className="inline-flex items-center rounded-lg border border-gray-200">
                           <button
                             onClick={() =>
-                              !cartLoading && productId && updateQuantity(
-                                productId,
-                                Math.max(1, (it.quantity ?? 1) - 1)
-                              )
+                              !cartLoading &&
+                              productId &&
+                              updateQuantity(productId, Math.max(1, qty - 1))
                             }
                             className="h-9 w-9 rounded-l-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                             aria-label="Disminuir"
-                            disabled={cartLoading || (it.quantity ?? 1) <= 1 || !productId}
+                            disabled={cartLoading || qty <= 1 || !productId}
                           >
                             −
                           </button>
@@ -228,7 +340,7 @@ export default function CheckoutPage() {
                             type="number"
                             min={1}
                             className="h-9 w-14 border-x border-gray-200 text-center text-sm outline-none"
-                            value={it.quantity ?? 1}
+                            value={qty}
                             onChange={(e) => {
                               const val = parseInt(e.target.value || "1", 10);
                               if (!cartLoading && productId) {
@@ -242,7 +354,9 @@ export default function CheckoutPage() {
                           />
                           <button
                             onClick={() =>
-                              !cartLoading && productId && updateQuantity(productId, (it.quantity ?? 1) + 1)
+                              !cartLoading &&
+                              productId &&
+                              updateQuantity(productId, qty + 1)
                             }
                             className="h-9 w-9 rounded-r-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                             aria-label="Aumentar"
@@ -252,7 +366,11 @@ export default function CheckoutPage() {
                           </button>
                         </div>
                         <button
-                          onClick={() => !cartLoading && productId && removeFromCart(productId)}
+                          onClick={() =>
+                            !cartLoading &&
+                            productId &&
+                            removeFromCart(productId)
+                          }
                           className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
                           disabled={cartLoading || !productId}
                         >
@@ -278,7 +396,11 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium text-gray-900">
-                  {subtotal.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 })}
+                  {subtotal.toLocaleString("es-CL", {
+                    style: "currency",
+                    currency: "CLP",
+                    minimumFractionDigits: 0,
+                  })}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -291,7 +413,11 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between text-base">
                 <span className="font-semibold text-gray-900">Total</span>
                 <span className="font-bold text-gray-900">
-                  {subtotal.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 })}
+                  {subtotal.toLocaleString("es-CL", {
+                    style: "currency",
+                    currency: "CLP",
+                    minimumFractionDigits: 0,
+                  })}
                 </span>
               </div>
             </div>
