@@ -798,6 +798,7 @@ export async function updateStoreConfig(cfg, token) {
       store_name: cfg.store_name,
       logo_url: cfg.logo_url,
       header_color: cfg.header_color,
+      selected_template: cfg.selected_template, // AGREGADO
     }),
   });
   if (!res.ok) throw new Error("Error actualizando configuración");

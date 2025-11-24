@@ -40,10 +40,11 @@ function OrderManager() {
 
   const getEstadoBadgeClass = (estado) => {
     const classes = {
-      creado: "bg-gray-100 text-gray-800 border-gray-200",
+      Pendiente: "bg-gray-100 text-gray-800 border-gray-200",
+      pagado: "bg-green-100 text-green-800 border-green-200",
       "en preparación": "bg-blue-100 text-blue-800 border-blue-200",
       "listo para retiro": "bg-yellow-100 text-yellow-800 border-yellow-200",
-      entregado: "bg-green-100 text-green-800 border-green-200",
+      entregado: "bg-purple-100 text-purple-800 border-purple-200",
       cancelado: "bg-red-100 text-red-800 border-red-200",
     };
     return classes[estado] || "bg-gray-100 text-gray-800 border-gray-200";
@@ -51,7 +52,8 @@ function OrderManager() {
 
   const getEstadoLabel = (estado) => {
     const labels = {
-      creado: "Creado",
+      Pendiente: "Pendiente",
+      Pagado: "Pagado",
       "en preparación": "En Preparación",
       "listo para retiro": "Listo para Retiro",
       entregado: "Entregado",
@@ -62,7 +64,8 @@ function OrderManager() {
 
   const getEstadoIcon = (estado) => {
     const icons = {
-      creado: "📝",
+      Pendiente: "⏳",
+      Pagado: "💰",
       "en preparación": "📦",
       "listo para retiro": "✅",
       entregado: "🎉",
@@ -122,7 +125,8 @@ function OrderManager() {
       <div className="mb-6 flex flex-wrap gap-2">
         {[
           { value: "todos", label: "Todos", icon: "📋" },
-          { value: "creado", label: "Creados", icon: "📝" },
+          { value: "pendiente", label: "Pendientes", icon: "⏳" },
+          { value: "pagado", label: "Pagado", icon: "💰" },
           { value: "en preparación", label: "En Preparación", icon: "📦" },
           {
             value: "listo para retiro",
@@ -135,11 +139,10 @@ function OrderManager() {
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-              filter === f.value
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${filter === f.value
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
           >
             <span>{f.icon}</span>
             {f.label}
@@ -373,7 +376,8 @@ function OrderManager() {
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          "creado",
+                          "Pendiente",
+                          "Pagado",
                           "en preparación",
                           "listo para retiro",
                           "entregado",
@@ -383,11 +387,10 @@ function OrderManager() {
                             key={estado}
                             onClick={() => handleUpdateEstado(o.id, estado)}
                             disabled={o.order_status === estado}
-                            className={`px-3 py-1.5 text-xs rounded-md font-medium transition ${
-                              o.order_status === estado
-                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                : "bg-blue-600 text-white hover:bg-blue-700"
-                            }`}
+                            className={`px-3 py-1.5 text-xs rounded-md font-medium transition ${o.order_status === estado
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : "bg-blue-600 text-white hover:bg-blue-700"
+                              }`}
                           >
                             {getEstadoIcon(estado)} {getEstadoLabel(estado)}
                           </button>
