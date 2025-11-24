@@ -152,7 +152,7 @@ export default function StoreTemplateA({
       <main className="container mx-auto px-4 py-6">
         {/* Hero */}
         <section className="mb-8">
-          <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-red-900 to-zinc-900 shadow-lg">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-900 to-zinc-900 shadow-lg">
             <div className="p-8 md:p-10 text-white">
               <h2 className="text-2xl md:text-3xl font-bold">
                 Bienvenido a {storeName}
@@ -212,9 +212,9 @@ export default function StoreTemplateA({
             const formattedPrice =
               price != null
                 ? price.toLocaleString("es-CL", {
-                    style: "currency",
-                    currency: "CLP",
-                  })
+                  style: "currency",
+                  currency: "CLP",
+                })
                 : null;
 
             return (

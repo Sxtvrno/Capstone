@@ -4925,8 +4925,7 @@ async def update_order_status(
 
     # Validar estado - SOLO RETIRO EN TIENDA
     estados_validos = [
-        "pendiente"
-        "pagado",
+        "creado",
         "en preparación",
         "listo para retiro",
         "entregado",
@@ -5060,21 +5059,15 @@ class StoreConfig(BaseModel):
     store_name: str
     logo_url: Optional[str] = None
     header_color: str
-    selected_template: str = 'A'  # AGREGADO
 
 
 @app.get("/api/public/store-config", response_model=StoreConfig)
 async def get_store_config(conn=Depends(get_db)):
     row = await conn.fetchrow(
-        "SELECT store_name, logo_url, header_color, selected_template FROM store_config ORDER BY id ASC LIMIT 1"
+        "SELECT store_name, logo_url, header_color FROM store_config ORDER BY id ASC LIMIT 1"
     )
     if not row:
-        return {
-            "store_name": "Mi Tienda", 
-            "logo_url": None, 
-            "header_color": "#111827",
-            "selected_template": "A"  # AGREGADO
-        }
+        return {"store_name": "Mi Tienda", "logo_url": None, "header_color": "#111827"}
     return dict(row)
 
 
@@ -5091,28 +5084,26 @@ async def update_store_config(
         await conn.execute(
             """
             UPDATE store_config
-            SET store_name=$1, logo_url=$2, header_color=$3, selected_template=$4, updated_at=NOW()
-            WHERE id=$5
+            SET store_name=$1, logo_url=$2, header_color=$3, updated_at=NOW()
+            WHERE id=$4
             """,
             cfg.store_name,
             cfg.logo_url,
             cfg.header_color,
-            cfg.selected_template,  # AGREGADO
             existing["id"],
         )
     else:
         await conn.execute(
             """
-            INSERT INTO store_config (store_name, logo_url, header_color, selected_template)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO store_config (store_name, logo_url, header_color)
+            VALUES ($1, $2, $3)
             """,
             cfg.store_name,
             cfg.logo_url,
             cfg.header_color,
-            cfg.selected_template,  # AGREGADO
         )
     row = await conn.fetchrow(
-        "SELECT store_name, logo_url, header_color, selected_template FROM store_config ORDER BY id ASC LIMIT 1"
+        "SELECT store_name, logo_url, header_color FROM store_config ORDER BY id ASC LIMIT 1"
     )
     return dict(row)
 
