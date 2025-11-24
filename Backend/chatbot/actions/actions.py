@@ -86,7 +86,6 @@ async def get_db_connection():
         logger.error(f"Error conectando a la base de datos: {e}")
         return None
 
-
 # ==================== ACCIÓN: BUSCAR FAQ ====================
 
 class ActionBuscarFAQ(Action):
@@ -254,6 +253,7 @@ class ActionConsultarPedido(Action):
             return []
         
         try:
+            # Obtener datos del pedido
             query = """
                 SELECT 
                     p.id,
@@ -261,34 +261,89 @@ class ActionConsultarPedido(Action):
                     p.total_price,
                     p.shipping_address,
                     p.created_at,
+                    p.updated_at,
                     c.first_name,
                     c.email
-                FROM Pedido p
-                JOIN Cliente c ON p.cliente_id = c.id
+                FROM pedido p
+                JOIN cliente c ON p.cliente_id = c.id
                 WHERE p.id = $1
             """
             pedido = await conn.fetchrow(query, int(pedido_id))
             
             if pedido:
-                # Formatear respuesta
+                # Obtener productos del pedido
+                productos_query = """
+                    SELECT 
+                        pr.title,
+                        dp.cantidad,
+                        dp.precio_unitario
+                    FROM detalle_pedido dp
+                    JOIN producto pr ON dp.producto_id = pr.id
+                    WHERE dp.pedido_id = $1
+                    ORDER BY pr.title
+                    LIMIT 5
+                """
+                productos = await conn.fetch(productos_query, int(pedido_id))
+                
+                # Obtener información de pago si existe
+                pago_query = """
+                    SELECT payment_status, payment_method, payment_date
+                    FROM pago
+                    WHERE order_id = $1
+                    ORDER BY payment_date DESC
+                    LIMIT 1
+                """
+                pago = await conn.fetchrow(pago_query, int(pedido_id))
+                
+                # Formatear respuesta compacta y clara
                 estado = pedido['order_status']
                 total = pedido['total_price']
                 fecha = pedido['created_at'].strftime("%d/%m/%Y")
                 direccion = pedido['shipping_address']
-                
-                mensaje = f"""
-📦 **Estado de tu Pedido #{pedido_id}**
 
-**Estado:** {estado.upper()}
-**Total:** ${total:,.0f}
-**Fecha:** {fecha}
-**Dirección de envío:** {direccion}
+                # Mapear estados a descripciones y emojis
+                estado_map = {
+                    'creado': '📝 Creado',
+                    'pagado': '💸 Pagado',
+                    'en_preparacion': '🛠️ En preparación',
+                    'listo_para_envio': '📦 Listo para envío',
+                    'enviado': '🚚 Enviado',
+                    'entregado': '🎉 Entregado',
+                    'cancelado': '❌ Cancelado',
+                }
+                estado_legible = estado_map.get(estado.lower().replace(' ', '_'), estado.capitalize())
 
-{self.mensaje_segun_estado(estado)}
-"""
+                # Productos
+                productos_texto = ""
+                if productos:
+                    productos_texto = "\n" + ", ".join([
+                        f"{prod['title']} (x{prod['cantidad']})"
+                        for prod in productos
+                    ])
+                else:
+                    productos_texto = "\n(Sin productos)"
+
+                # Pago
+                pago_texto = ""
+                if pago:
+                    pago_texto = f" | Pago: {pago['payment_status']}"
+                    if pago['payment_method']:
+                        pago_texto += f" ({pago['payment_method']})"
+
+                # Mensaje final compacto
+                mensaje = (
+                    f"Pedido #{pedido_id}\n"
+                    f"Estado: {estado_legible}\n"
+                    f"Total: ${total:,.0f} | Fecha: {fecha}{pago_texto}\n"
+                    f"Productos:{productos_texto}\n"
+                    f"Fecha: {fecha}{pago_texto}\n"
+                    f"Envío: {direccion if direccion else 'No especificado'}"
+                )
                 dispatcher.utter_message(text=mensaje.strip())
             else:
-                dispatcher.utter_message(response="utter_pedido_no_encontrado")
+                dispatcher.utter_message(
+                    text=f"❌ No encontré el pedido #{pedido_id}. Por favor verifica el número de pedido o contacta a soporte."
+                )
         
         except Exception as e:
             logger.error(f"Error consultando pedido: {e}")
@@ -305,18 +360,7 @@ class ActionConsultarPedido(Action):
         match = re.search(r'\b\d{1,6}\b', text)
         return match.group(0) if match else None
     
-    def mensaje_segun_estado(self, estado: str) -> str:
-        """Devuelve mensaje adicional según el estado del pedido."""
-        mensajes = {
-            'creado': 'Tu pedido ha sido creado y está en proceso de validación de pago.',
-            'pagado': '✅ Pago confirmado. Estamos preparando tu pedido para envío.',
-            'preparando': '📦 Tu pedido está siendo preparado en nuestro almacén.',
-            'enviado': '🚚 Tu pedido está en camino. Pronto recibirás el número de seguimiento.',
-            'en_transito': '🚚 Tu pedido está en tránsito hacia tu dirección.',
-            'entregado': '✅ Tu pedido ha sido entregado. ¡Disfrútalo!',
-            'cancelado': '❌ Este pedido ha sido cancelado.'
-        }
-        return mensajes.get(estado.lower(), 'Consulta con nuestro equipo para más detalles.')
+    # emoji_estado y mensaje_segun_estado ya no son necesarios con el nuevo formato
 
 
 # ==================== ACCIÓN: CREAR TICKET ====================
@@ -397,10 +441,6 @@ class ActionCrearTicket(Action):
                     )
                 except Exception as e:
                     logger.warning(f"No se pudo registrar interacción post-ticket: {e}")
-            
-            dispatcher.utter_message(
-                text=f"✅ Tu ticket #{ticket_id} ha sido creado. Un agente te contactará pronto."
-            )
         
         except Exception as e:
             logger.error(f"Error creando ticket: {e}")

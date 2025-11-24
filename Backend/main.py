@@ -203,11 +203,11 @@ class ProductoCreate(BaseModel):
     category_id: int
 
 
-class ImagenProductoCreate(BaseModel):
+class ProductoImagenCreate(BaseModel):
     url_imagen: str
 
 
-class ImagenProductoResponse(BaseModel):
+class ProductoImagenResponse(BaseModel):
     id: int
     producto_id: int
     url_imagen: str
@@ -685,6 +685,7 @@ async def get_current_admin(user: dict = Depends(get_current_user)):
 class CartAddItemRequest(BaseModel):
     producto_id: int
     quantity: int = 1
+    session_id: Optional[str] = None
 
 
 class CartUpdateItemRequest(BaseModel):
@@ -750,9 +751,8 @@ async def get_current_user_optional(
 async def get_or_create_cart(
     conn, *, cliente_id: Optional[int] = None, session_id: Optional[str] = None
 ):
-    if not cliente_id and not session_id:
-        raise HTTPException(status_code=400, detail="Se requiere cliente o session_id")
     if cliente_id:
+        # Si hay cliente_id, solo usar cliente_id (usuario autenticado)
         cart = await conn.fetchrow(
             "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
         )
@@ -761,7 +761,8 @@ async def get_or_create_cart(
                 "INSERT INTO Carrito (cliente_id) VALUES ($1) RETURNING id", cliente_id
             )
         return cart["id"]
-    else:
+    elif session_id:
+        # Si no hay cliente_id, usar session_id (usuario anónimo)
         cart = await conn.fetchrow(
             "SELECT id FROM Carrito WHERE session_id = $1", session_id
         )
@@ -770,6 +771,12 @@ async def get_or_create_cart(
                 "INSERT INTO Carrito (session_id) VALUES ($1) RETURNING id", session_id
             )
         return cart["id"]
+    else:
+        # Si no hay ninguno, error
+        raise HTTPException(
+            status_code=400,
+            detail="Se requiere session_id para carritos anónimos o cliente_id para autenticados",
+        )
 
 
 async def get_cart_summary(conn, cart_id: int) -> CartResponse:
@@ -780,9 +787,17 @@ async def get_cart_summary(conn, cart_id: int) -> CartResponse:
                ac.total_price,
                p.title,
                p.price AS unit_price,
-               p.stock_quantity
+               p.stock_quantity,
+               img.url_imagen
         FROM ArticuloCarrito ac
         JOIN Producto p ON p.id = ac.producto_id
+        LEFT JOIN LATERAL (
+            SELECT url_imagen
+            FROM productoimagen
+            WHERE producto_id = p.id
+            ORDER BY id ASC
+            LIMIT 1
+        ) img ON TRUE
         WHERE ac.carrito_id = $1
         ORDER BY ac.producto_id
         """,
@@ -796,6 +811,7 @@ async def get_cart_summary(conn, cart_id: int) -> CartResponse:
             "quantity": r["quantity"],
             "total_price": float(r["total_price"]),
             "stock_quantity": r["stock_quantity"],
+            "url_imagen": r["url_imagen"],
         }
         for r in rows
     ]
@@ -848,6 +864,32 @@ async def get_cart(
     return await get_cart_summary(conn, cart_id)
 
 
+@app.get("/api/cart/items", response_model=CartResponse)
+async def get_cart_items(
+    session_id: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user_optional),
+    conn=Depends(get_db),
+):
+    """
+    Obtener los items del carrito.
+    - Cliente autenticado: ignora session_id y usa su carrito.
+    - Anónimo: requiere session_id.
+    """
+    if not user and not session_id:
+        raise HTTPException(
+            status_code=400, detail="session_id requerido para carritos anónimos"
+        )
+    cart_id = await get_or_create_cart(
+        conn,
+        cliente_id=user["id"] if user and user.get("role") == ROLE_CLIENTE else None,
+        session_id=session_id,
+    )
+    await conn.execute(
+        "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", cart_id
+    )
+    return await get_cart_summary(conn, cart_id)
+
+
 @app.post("/api/cart/items", response_model=CartResponse)
 async def add_item_cart(
     payload: CartAddItemRequest,
@@ -858,10 +900,14 @@ async def add_item_cart(
     """
     Agregar un producto al carrito (o incrementar su cantidad).
     """
-    if not user and not session_id:
-        raise HTTPException(
-            status_code=400, detail="session_id requerido para carritos anónimos"
-        )
+    # Si no hay usuario, tomar session_id del payload si no viene por query
+    if not user:
+        if not session_id:
+            session_id = getattr(payload, "session_id", None)
+        if not session_id:
+            raise HTTPException(
+                status_code=400, detail="session_id requerido para carritos anónimos"
+            )
     if payload.quantity <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
 
@@ -1019,19 +1065,31 @@ async def remove_item_cart(
     return await get_cart_summary(conn, cart_id)
 
 
+from fastapi import Request
+
+
 @app.post("/api/cart/clear", response_model=CartResponse)
 async def clear_cart(
     session_id: Optional[str] = None,
     user: Optional[dict] = Depends(get_current_user_optional),
     conn=Depends(get_db),
+    request: Request = None,
 ):
     """
     Vaciar el carrito.
     """
-    if not user and not session_id:
-        raise HTTPException(
-            status_code=400, detail="session_id requerido para carritos anónimos"
-        )
+    # Si no hay usuario, tomar session_id del body si no viene por query
+    if not user:
+        if not session_id and request is not None:
+            try:
+                data = await request.json()
+                session_id = data.get("session_id")
+            except Exception:
+                pass
+        if not session_id:
+            raise HTTPException(
+                status_code=400, detail="session_id requerido para carritos anónimos"
+            )
 
     cart_id = await get_or_create_cart(
         conn,
@@ -1554,9 +1612,9 @@ async def admin_list_pedidos(
             # Obtener items del pedido
             items = await conn.fetch(
                 """
-                SELECT dp.producto_id, dp.quantity, dp.unit_price,
+                SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
                        p.title as product_name
-                FROM detallepedido dp
+                FROM detalle_pedido dp
                 LEFT JOIN producto p ON p.id = dp.producto_id
                 WHERE dp.pedido_id = $1
                 ORDER BY dp.producto_id
@@ -1594,12 +1652,12 @@ async def client_list_pedidos(
             pedido = dict(r)
             items = await conn.fetch(
                 """
-                SELECT dp.producto_id, dp.quantity, dp.unit_price,
-                       p.title as product_name
-                FROM detallepedido dp
-                LEFT JOIN producto p ON p.id = dp.producto_id
-                WHERE dp.pedido_id = $1
-                ORDER BY dp.producto_id
+                  SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                      p.title as product_name
+                  FROM detalle_pedido dp
+                  LEFT JOIN producto p ON p.id = dp.producto_id
+                  WHERE dp.pedido_id = $1
+                  ORDER BY dp.producto_id
                 """,
                 pedido["id"],
             )
@@ -1655,12 +1713,12 @@ async def get_pedido_for_boleta(
 
         items = await conn.fetch(
             """
-            SELECT dp.producto_id, dp.quantity, dp.unit_price,
-                   p.title as product_name, p.sku
-            FROM detallepedido dp
-            LEFT JOIN producto p ON p.id = dp.producto_id
-            WHERE dp.pedido_id = $1
-            ORDER BY dp.producto_id
+                 SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                     p.title as product_name, p.sku
+                 FROM detalle_pedido dp
+                 LEFT JOIN producto p ON p.id = dp.producto_id
+                 WHERE dp.pedido_id = $1
+                 ORDER BY dp.producto_id
             """,
             pedido_id,
         )
@@ -1681,12 +1739,10 @@ async def send_boleta_email(
     conn=Depends(get_db),
 ):
     """
-    Enviar boleta (pedido) por correo al email del cliente (o to_email si se provee).
-    Solo admin o propietario del pedido pueden solicitar el envío.
+    Enviar boleta del pedido por correo (formato alineado con OrderManager / PaymentReturn).
     """
     try:
-        # Obtener pedido + cliente
-        pedido = await conn.fetchrow(
+        pedido_row = await conn.fetchrow(
             """
             SELECT p.id, p.cliente_id, p.order_status, p.shipping_address, p.total_price,
                    p.created_at, p.updated_at,
@@ -1697,12 +1753,11 @@ async def send_boleta_email(
             """,
             pedido_id,
         )
-        if not pedido:
+        if not pedido_row:
             raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        pedido = dict(pedido_row)
 
-        pedido = dict(pedido)
-
-        # Permisos: admin o propietario
+        # Permisos
         if (
             current_user.get("role") != ROLE_ADMIN
             and current_user.get("id") != pedido["cliente_id"]
@@ -1711,7 +1766,6 @@ async def send_boleta_email(
                 status_code=403, detail="No tienes permiso para enviar esta boleta"
             )
 
-        # Determinar destinatario
         to_email = (
             (payload.to_email or pedido.get("cliente_email"))
             if payload
@@ -1722,14 +1776,14 @@ async def send_boleta_email(
                 status_code=400, detail="No hay email disponible para enviar la boleta"
             )
 
-        # Obtener items (si se requiere)
+        # Items (detalles)
         items = []
         if not payload or payload.include_items:
             rows = await conn.fetch(
                 """
-                SELECT dp.producto_id, dp.quantity, dp.unit_price,
-                       p.title as product_name
-                FROM detallepedido dp
+                SELECT dp.producto_id, dp.cantidad, dp.precio_unitario,
+                       p.title as product_name, p.sku
+                FROM detalle_pedido dp
                 LEFT JOIN producto p ON p.id = dp.producto_id
                 WHERE dp.pedido_id = $1
                 ORDER BY dp.producto_id
@@ -1738,59 +1792,135 @@ async def send_boleta_email(
             )
             items = [dict(r) for r in rows]
 
-        # Construir HTML de la boleta
-        created_at = pedido.get("created_at")
-        created_str = (
-            created_at.strftime("%Y-%m-%d %H:%M:%S")
-            if isinstance(created_at, datetime)
-            else str(created_at)
-        )
+        # Helpers
+        def fmt_dt(d):
+            if isinstance(d, datetime):
+                return d.strftime("%Y-%m-%d %H:%M:%S")
+            return str(d) if d else "—"
 
-        html_lines = []
-        html_lines.append(f"<h2>Boleta / Pedido #{pedido['id']}</h2>")
-        html_lines.append(f"<p>Fecha: {created_str}</p>")
-        html_lines.append(
-            f"<p>Cliente: {pedido.get('cliente_first_name', '')} {pedido.get('cliente_last_name', '')} ({to_email})</p>"
-        )
-        html_lines.append(
-            f"<p>Dirección envío: {pedido.get('shipping_address', '—')}</p>"
-        )
-        html_lines.append(f"<p>Estado: {pedido.get('order_status', '—')}</p>")
-        html_lines.append("<hr/>")
+        def get_nombre_item(it, idx):
+            candidatos = [
+                it.get("product_name"),
+                it.get("title"),
+            ]
+            for c in candidatos:
+                if isinstance(c, str) and c.strip():
+                    return c.strip()
+            if it.get("producto_id"):
+                return f"Producto #{it['producto_id']}"
+            return f"Item {idx + 1}"
 
-        if items:
-            html_lines.append("<h3>Productos</h3>")
-            html_lines.append('<table border="1" cellpadding="6" cellspacing="0">')
-            html_lines.append(
-                "<thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th></tr></thead><tbody>"
-            )
-            for it in items:
-                name = it.get("product_name") or f"ID {it.get('producto_id')}"
-                qty = int(it.get("quantity") or 0)
-                unit = float(it.get("unit_price") or 0.0)
-                total = unit * qty
-                html_lines.append(
-                    f"<tr><td>{name}</td><td align='center'>{qty}</td><td align='right'>${unit:.2f}</td><td align='right'>${total:.2f}</td></tr>"
+        def badge_color(estado):
+            if not estado:
+                return "#6b7280"
+            e = estado.lower()
+            if "crea" in e:
+                return "#1d4ed8"
+            if "pend" in e:
+                return "#b45309"
+            if "prep" in e:
+                return "#4338ca"
+            if "env" in e or "ship" in e:
+                return "#6d28d9"
+            if "entreg" in e or "comp" in e or "pag" in e:
+                return "#047857"
+            if "canc" in e or "rech" in e:
+                return "#b91c1c"
+            return "#374151"
+
+        created_str = fmt_dt(pedido.get("created_at"))
+        estado = pedido.get("order_status", "—")
+        estado_color = badge_color(estado)
+        total_pedido = int(pedido.get("total_price") or 0)
+
+        # Calcular total items (desde detalles, más preciso si existen)
+        total_items_calc = int(
+            sum(
+                (
+                    float(it.get("precio_unitario") or it.get("unit_price") or 0.0)
+                    * int(it.get("cantidad") or it.get("quantity") or 0)
                 )
-            html_lines.append("</tbody></table>")
-            # calcular total seguro
-            total_calc = sum(
-                (float(it.get("unit_price") or 0.0) * int(it.get("quantity") or 0))
                 for it in items
             )
-            html_lines.append(
-                f"<p><strong>Total (items): ${total_calc:.2f}</strong></p>"
-            )
-
-        # Añadir total del pedido (campo pedido.total_price)
-        html_lines.append(
-            f"<p><strong>Total pedido registrado: ${float(pedido.get('total_price') or 0.0):.2f}</strong></p>"
+            if items
+            else total_pedido
         )
 
-        html_lines.append("<p>Gracias por su compra.</p>")
+        # HTML
+        html_lines = []
+        html_lines.append(
+            f"""
+            <div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+              <div style="padding:20px;background:#f9fafb">
+                <h2 style="margin:0 0 4px;font-size:20px;color:#111827">Boleta / Pedido #{pedido["id"]}</h2>
+                <span style="display:inline-block;padding:4px 10px;font-size:12px;border-radius:16px;background:{estado_color}20;color:{estado_color};font-weight:600;margin-bottom:10px">
+                  {estado}
+                </span>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Fecha:</strong> {created_str}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Cliente:</strong> {pedido.get("cliente_first_name", "")} {pedido.get("cliente_last_name", "")} ({to_email})</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Dirección envío:</strong> {pedido.get("shipping_address", "—")}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Total pedido:</strong> ${total_pedido:,}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151"><strong>Items:</strong> {len(items)}</p>
+              </div>
+            """
+        )
+
+        if items:
+            html_lines.append(
+                """
+                <div style="padding:4px 20px 16px;background:#ffffff">
+                  <h3 style="font-size:16px;margin:16px 0 8px;color:#111827">Productos</h3>
+                  <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                      <tr style="background:#f3f4f6">
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Producto</th>
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Cantidad</th>
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Unit.</th>
+                        <th style="text-align:left;padding:8px;border:1px solid #e5e7eb">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                """
+            )
+            for idx, it in enumerate(items):
+                nombre = get_nombre_item(it, idx)
+                qty = int(it.get("cantidad") or it.get("quantity") or 0)
+                unit = int(it.get("precio_unitario") or it.get("unit_price") or 0)
+                sub = unit * qty
+                html_lines.append(
+                    f"""
+                      <tr>
+                        <td style="padding:8px;border:1px solid #e5e7eb">{nombre}</td>
+                        <td style="padding:8px;border:1px solid #e5e7eb">{qty}</td>
+                        <td style="padding:8px;border:1px solid #e5e7eb">${unit:,}</td>
+                        <td style="padding:8px;border:1px solid #e5e7eb;font-weight:600">${sub:,}</td>
+                      </tr>
+                    """
+                )
+            html_lines.append(
+                f"""
+                    </tbody>
+                  </table>
+                  <p style="margin:12px 0 0;font-size:13px;color:#374151">
+                    <strong>Total (items calculado):</strong> ${total_items_calc:,}
+                  </p>
+                  <p style="margin:4px 0 0;font-size:13px;color:#374151">
+                    <strong>Total pedido registrado:</strong> ${total_pedido:,}
+                  </p>
+                </div>
+                """
+            )
+
+        html_lines.append(
+            """
+              <div style="padding:16px 20px;background:#f9fafb">
+                <p style="margin:0;font-size:12px;color:#6b7280">Gracias por su compra.</p>
+              </div>
+            </div>
+            """
+        )
 
         html_body = "<html><body>" + "".join(html_lines) + "</body></html>"
-
         subject = f"Boleta Pedido #{pedido['id']}"
 
         sent = await email_service.send_email(
@@ -2006,11 +2136,11 @@ async def eliminar_producto(
 
 
 @app.post(
-    "/api/productos/{producto_id}/imagenes", response_model=List[ImagenProductoResponse]
+    "/api/productos/{producto_id}/imagenes", response_model=List[ProductoImagenResponse]
 )
 async def agregar_imagenes_producto(
     producto_id: int,
-    imagenes: List[ImagenProductoCreate],
+    imagenes: List[ProductoImagenCreate],
     conn=Depends(get_db),
     current_admin: dict = Depends(get_current_admin),
 ):
@@ -2031,7 +2161,7 @@ async def agregar_imagenes_producto(
 
 
 @app.get(
-    "/api/productos/{producto_id}/imagenes", response_model=List[ImagenProductoResponse]
+    "/api/productos/{producto_id}/imagenes", response_model=List[ProductoImagenResponse]
 )
 async def obtener_imagenes_producto(
     producto_id: int,
@@ -2129,7 +2259,7 @@ async def obtener_productos_publicos(
 
 @app.get(
     "/api/public/productos/{producto_id}/imagenes",
-    response_model=List[ImagenProductoResponse],
+    response_model=List[ProductoImagenResponse],
 )
 async def obtener_imagenes_producto_publicas(
     producto_id: int,
@@ -2244,6 +2374,7 @@ async def crear_cliente_admin(
             cliente.last_name,
             cliente.phone,
         )
+
         return dict(result)
     except asyncpg.exceptions.UniqueViolationError:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
@@ -2815,6 +2946,32 @@ async def tbk_create(
                 detail="Cliente autenticado requerido para crear pedido",
             )
 
+        cliente_id = current_user["id"]
+
+        # Buscar si ya existe un pedido pendiente para este cliente
+        pedido_row = await conn.fetchrow(
+            "SELECT id FROM pedido WHERE cliente_id = $1 AND order_status = 'Pendiente' ORDER BY created_at DESC LIMIT 1",
+            cliente_id,
+        )
+        if pedido_row:
+            pedido_id = pedido_row["id"]
+        else:
+            # Crear nuevo pedido
+            insert_q = """
+                INSERT INTO pedido (cliente_id, order_status, shipping_address, total_price, created_at)
+                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                RETURNING id
+            """
+            shipping_address = "No especificado"
+            row = await conn.fetchrow(
+                insert_q,
+                cliente_id,
+                "Pendiente",
+                shipping_address,
+                float(payload.amount),
+            )
+            pedido_id = row["id"] if row else None
+
         def make_buy_order(pedido_id: Optional[int]) -> str:
             base = (
                 f"O{pedido_id}" if pedido_id else f"O{int(datetime.now().timestamp())}"
@@ -2822,127 +2979,81 @@ async def tbk_create(
             rnd = secrets.token_hex(2).upper()
             return f"{base}{rnd}"[:26]
 
-        buy_order = make_buy_order(payload.pedido_id)
+        buy_order = make_buy_order(pedido_id)
         session_id_tbk = (payload.session_id or "anon")[:61]
         return_url = (payload.return_url or f"{FRONTEND_URL}/payment/return").strip()
 
-        cliente_id = current_user["id"]
+        # Guardar en memoria temporal para la confirmación
+        pending_transactions[buy_order] = {
+            "pedido_id": pedido_id,
+            "amount": int(payload.amount),
+            "cliente_id": cliente_id,
+            "session_id": payload.session_id,
+        }
 
-        pedido_id_created = None
-        try:
-            async with conn.transaction():
-                insert_q = """
-                    INSERT INTO pedido (cliente_id, order_status, shipping_address, total_price, created_at)
-                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                    RETURNING id
-                """
-                shipping_address = "No especificado"
-                row = await conn.fetchrow(
-                    insert_q,
-                    cliente_id,
-                    "Pendiente",
-                    shipping_address,
-                    float(payload.amount),
+        # Insertar detalle_pedido si no existe
+        detalles = await conn.fetch(
+            "SELECT 1 FROM detalle_pedido WHERE pedido_id = $1 LIMIT 1",
+            pedido_id,
+        )
+        if not detalles:
+            # Obtener items del carrito
+            cart = await conn.fetchrow(
+                "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
+            )
+            cart_items = []
+            if cart:
+                cart_id = cart["id"]
+                cart_items = await conn.fetch(
+                    """
+                    SELECT producto_id, quantity, total_price
+                    FROM ArticuloCarrito
+                    WHERE carrito_id = $1
+                    """,
+                    cart_id,
                 )
-                pedido_id_created = row["id"] if row else None
-
-                if pedido_id_created:
-                    # Primero intentar obtener items desde el carrito del cliente
-                    cart = await conn.fetchrow(
-                        "SELECT id FROM Carrito WHERE cliente_id = $1", cliente_id
-                    )
-                    cart_items = []
-                    if cart:
-                        cart_id = cart["id"]
-                        cart_items = await conn.fetch(
-                            """
-                            SELECT producto_id, quantity, total_price
-                            FROM ArticuloCarrito
-                            WHERE carrito_id = $1
-                            """,
-                            cart_id,
-                        )
-
-                    total_calc = 0.0
-
-                    # Si no hay items en el carrito, usar payload.items si vienen
-                    if (not cart_items) and payload.items:
-                        for it in payload.items:
-                            pid = it.producto_id
-                            qty = max(int(it.quantity or 1), 1)
-                            # prioridad: unit_price > total_price/qty > producto.price from Producto
-                            if it.unit_price is not None:
-                                unit_price = float(it.unit_price)
-                            elif it.total_price is not None:
-                                unit_price = float(it.total_price) / qty
-                            else:
-                                prod = await ensure_product_and_price(conn, pid)
-                                unit_price = float(prod["price"])
-                            await conn.execute(
-                                """
-                                INSERT INTO detallepedido (pedido_id, producto_id, quantity, unit_price)
-                                VALUES ($1, $2, $3, $4)
-                                ON CONFLICT (pedido_id, producto_id) DO UPDATE
-                                SET quantity = EXCLUDED.quantity, unit_price = EXCLUDED.unit_price
-                                """,
-                                pedido_id_created,
-                                pid,
-                                qty,
-                                unit_price,
-                            )
-                            total_calc += unit_price * qty
-                    else:
-                        # usar items del carrito (si existen)
-                        for it in cart_items:
-                            pid = it["producto_id"]
-                            qty = max(int(it["quantity"] or 1), 1)
-                            total_price_item = (
-                                float(it["total_price"])
-                                if it["total_price"] is not None
-                                else 0.0
-                            )
-                            unit_price = (
-                                total_price_item / qty
-                                if qty > 0 and total_price_item > 0
-                                else None
-                            )
-                            if unit_price is None:
-                                prod = await ensure_product_and_price(conn, pid)
-                                unit_price = float(prod["price"])
-                            await conn.execute(
-                                """
-                                INSERT INTO detallepedido (pedido_id, producto_id, quantity, unit_price)
-                                VALUES ($1, $2, $3, $4)
-                                ON CONFLICT (pedido_id, producto_id) DO UPDATE
-                                SET quantity = EXCLUDED.quantity, unit_price = EXCLUDED.unit_price
-                                """,
-                                pedido_id_created,
-                                pid,
-                                qty,
-                                unit_price,
-                            )
-                            total_calc += unit_price * qty
-
-                    # Actualizar total_price del pedido con el cálculo real si es distinto
-                    if total_calc > 0:
-                        await conn.execute(
-                            "UPDATE pedido SET total_price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-                            total_calc,
-                            pedido_id_created,
-                        )
-
-                    # Limpiar carrito (opcional)
-                    if cart and cart_items:
-                        await conn.execute(
-                            "DELETE FROM ArticuloCarrito WHERE carrito_id = $1", cart_id
-                        )
-                        await conn.execute(
-                            "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-                            cart_id,
-                        )
-        except Exception as e:
-            logger.error(f"Error creando pedido y detalle en DB: {e}")
-            pedido_id_created = None
+            total_calc = 0.0
+            for it in cart_items:
+                pid = it["producto_id"]
+                qty = max(int(it["quantity"] or 1), 1)
+                total_price_item = (
+                    float(it["total_price"]) if it["total_price"] is not None else 0.0
+                )
+                unit_price = (
+                    total_price_item / qty if qty > 0 and total_price_item > 0 else None
+                )
+                if unit_price is None:
+                    prod = await ensure_product_and_price(conn, pid)
+                    unit_price = float(prod["price"])
+                await conn.execute(
+                    """
+                    INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (pedido_id, producto_id) DO UPDATE
+                    SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
+                    """,
+                    pedido_id,
+                    pid,
+                    qty,
+                    unit_price,
+                )
+                total_calc += unit_price * qty
+            # Actualizar total_price del pedido
+            if total_calc > 0:
+                await conn.execute(
+                    "UPDATE pedido SET total_price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+                    total_calc,
+                    pedido_id,
+                )
+            # Limpiar carrito
+            if cart and cart_items:
+                await conn.execute(
+                    "DELETE FROM ArticuloCarrito WHERE carrito_id = $1", cart_id
+                )
+                await conn.execute(
+                    "UPDATE Carrito SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+                    cart_id,
+                )
 
         tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
         resp = tx.create(buy_order, session_id_tbk, int(payload.amount), return_url)
@@ -2959,15 +3070,14 @@ async def tbk_create(
                 status_code=500, detail="Transbank no devolvió token o URL"
             )
 
-        if pedido_id_created:
-            pending_transactions[token] = {
-                "pedido_id": pedido_id_created,
-                "amount": float(payload.amount),
-                "buy_order": buy_order,
-            }
+        # Relacionar el token con el pedido
+        pending_transactions[token] = {
+            "pedido_id": pedido_id,
+            "amount": float(payload.amount),
+            "buy_order": buy_order,
+        }
 
-        # Devolver id del pedido junto con token/url para que el frontend lo use
-        return {"token": token, "url": url, "pedido_id": pedido_id_created}
+        return {"token": token, "url": url, "pedido_id": pedido_id}
     except HTTPException:
         raise
     except RequestValidationError as e:
@@ -2987,110 +3097,69 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
         tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
         resp = tx.commit(payload.token_ws)
         status = resp.get("status")
+        buy_order = resp.get("buy_order")
 
-        # Intentar encontrar metadata temporal por token_ws
-        meta = pending_transactions.get(payload.token_ws)
+        # Buscar metadata temporal por token_ws o buy_order
+        meta = pending_transactions.get(payload.token_ws) or pending_transactions.get(
+            buy_order
+        )
         pedido_id = None
-        pedido_db = None
-
         if meta and meta.get("pedido_id"):
             pedido_id = meta["pedido_id"]
-            try:
-                pedido_db = await conn.fetchrow(
-                    "SELECT id FROM pedido WHERE id = $1", pedido_id
-                )
-            except Exception as e:
-                logger.debug(
-                    f"No se pudo buscar Pedido por id desde pending_transactions: {e}"
-                )
-                pedido_db = None
-
-        # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
-        if not pedido_id:
-            buy_order = resp.get("buy_order")
-            if buy_order:
+        else:
+            # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
+            if buy_order and buy_order.startswith("O"):
                 try:
-                    # extraer dígitos luego de 'O'
-                    s = str(buy_order)
-                    if s.startswith("O"):
-                        possible = s[1:]
-                        # tomar la secuencia inicial de dígitos
-                        digits = ""
-                        for ch in possible:
-                            if ch.isdigit():
-                                digits += ch
-                            else:
-                                break
-                        if digits:
-                            candidate_id = int(digits)
-                            pedido_db = await conn.fetchrow(
-                                "SELECT id FROM pedido WHERE id = $1", candidate_id
-                            )
-                            if pedido_db:
-                                pedido_id = pedido_db["id"]
-                except Exception as e:
-                    logger.debug(f"No se pudo extraer pedido_id de buy_order: {e}")
+                    pedido_id = int("".join(filter(str.isdigit, buy_order[1:])))
+                except Exception:
+                    pedido_id = None
 
         if status == "AUTHORIZED":
             # Intentar actualizar Pedido a "Pagado" (si se encontró)
             try:
                 if pedido_id:
-                    update_q = """
-                        UPDATE pedido
-                        SET order_status = $1,
-                            total_price = COALESCE($2, total_price),
-                            updated_at = COALESCE($3, CURRENT_TIMESTAMP)
-                        WHERE id = $4
-                    """
-                    # Parsear transaction_date a datetime si viene como string ISO
-                    transaction_date = resp.get("transaction_date")
-                    if isinstance(transaction_date, str):
-                        try:
-                            if transaction_date.endswith("Z"):
-                                transaction_date = transaction_date.replace(
-                                    "Z", "+00:00"
-                                )
-                            transaction_date = datetime.fromisoformat(transaction_date)
-                        except Exception:
-                            logger.debug(
-                                f"No se pudo parsear transaction_date: {resp.get('transaction_date')}"
-                            )
-                            transaction_date = None
-
-                    # Asegurar amount como float o None
-                    amount_val = resp.get("amount")
-                    try:
-                        amount_val = (
-                            float(amount_val) if amount_val is not None else None
-                        )
-                    except Exception:
-                        amount_val = None
-
-                    # Ejecutar update con los 4 parámetros esperados
                     await conn.execute(
-                        update_q, "Pagado", amount_val, transaction_date, pedido_id
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'Pagado',
+                            notas = 'Pago autorizado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
                     )
-
-                    # eliminar meta temporal si existe
-                    pending_transactions.pop(payload.token_ws, None)
-                else:
-                    logger.debug(
-                        "Transbank autorizado pero no se encontró pedido asociado para actualizar."
+                    logger.info(
+                        f"Pedido {pedido_id} marcado como pagado por pago autorizado"
                     )
             except Exception as e:
-                logger.error(f"Error actualizando Pedido a Pagado: {e}")
+                logger.error(f"Error actualizando pedido pagado: {e}")
 
-            # devolver pedido_id si está disponible para que el frontend lo use
-            pedido_id_for_resp = None
-            if meta and meta.get("pedido_id"):
-                pedido_id_for_resp = meta.get("pedido_id")
-            elif pedido_id:
-                pedido_id_for_resp = pedido_id
+            # eliminar meta temporal si existe
+            pending_transactions.pop(payload.token_ws, None)
+
+            # Descontar stock de producto para todos los productos del pedido
+            detalles_pedido = await conn.fetch(
+                "SELECT producto_id, cantidad FROM detalle_pedido WHERE pedido_id = $1",
+                pedido_id,
+            )
+            for det in detalles_pedido:
+                await conn.execute(
+                    """
+                    UPDATE producto
+                    SET stock_quantity = stock_quantity - $1
+                    WHERE id = $2
+                    """,
+                    det["cantidad"],
+                    det["producto_id"],
+                )
+            logger.info(
+                f"Stock descontado para pedido {pedido_id} tras confirmación de pago."
+            )
 
             return {
                 "status": "success",
-                "pedido_id": pedido_id_for_resp,
-                "buy_order": resp.get("buy_order"),
+                "pedido_id": pedido_id,
+                "buy_order": buy_order,
                 "amount": resp.get("amount"),
                 "authorization_code": resp.get("authorization_code"),
                 "payment_type_code": resp.get("payment_type_code"),
@@ -3098,6 +3167,25 @@ async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_d
                 "installments_number": resp.get("installments_number"),
             }
         else:
+            # Si el pago fue rechazado, actualizar pedido a cancelado (si existe)
+            if buy_order and buy_order in pending_transactions:
+                transaction_data = pending_transactions[buy_order]
+                pedido_id = transaction_data.get("pedido_id")
+                if pedido_id:
+                    await conn.execute(
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'cancelado',
+                            notas = 'Pago rechazado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
+                    )
+                    logger.info(
+                        f"Pedido {pedido_id} marcado como cancelado por pago rechazado"
+                    )
+                del pending_transactions[buy_order]
             return {"status": "rejected", "detail": resp}
     except HTTPException:
         raise
@@ -3134,7 +3222,185 @@ logger.info(
 
 
 # Almacenamiento temporal de transacciones
-pending_transactions = {}
+@app.post("/api/transbank/confirm")
+async def tbk_confirm(payload: TBKConfirmRequest = Body(...), conn=Depends(get_db)):
+    try:
+        if not payload.token_ws:
+            raise HTTPException(status_code=400, detail="token_ws requerido")
+
+        tx = Transaction(TBK_OPTIONS) if TBK_OPTIONS else Transaction()
+        resp = tx.commit(payload.token_ws)
+        status = resp.get("status")
+        buy_order = resp.get("buy_order")
+
+        # Buscar metadata temporal por token_ws
+        meta = pending_transactions.get(payload.token_ws)
+        pedido_id = None
+        if meta and meta.get("pedido_id"):
+            pedido_id = meta["pedido_id"]
+        else:
+            # Si no encontramos por meta, intentar extraer id desde buy_order (formato O{pedidoId}...)
+            if buy_order and buy_order.startswith("O"):
+                try:
+                    pedido_id = int("".join(filter(str.isdigit, buy_order[1:])))
+                except Exception:
+                    pedido_id = None
+
+        if status == "AUTHORIZED":
+            try:
+                if pedido_id:
+                    logger.info(
+                        f"[TBK_CONFIRM] Actualizando pedido {pedido_id} a pagado..."
+                    )
+                    # 1. Actualizar pedido a pagado
+                    await conn.execute(
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'pagado',
+                            notas = 'Pago autorizado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
+                    )
+                    logger.info(
+                        f"[TBK_CONFIRM] Pedido {pedido_id} actualizado a pagado."
+                    )
+
+                    # 2. Insertar en pago
+                    logger.info(
+                        f"[TBK_CONFIRM] Insertando registro en pago para pedido {pedido_id}..."
+                    )
+                    logger.info(
+                        f"[TBK_CONFIRM] Datos pago: order_id={pedido_id}, payment_method={resp.get('payment_type_code') or 'webpay'}, status={status}, transaction_id={resp.get('buy_order')}, amount={resp.get('amount')}, auth_code={resp.get('authorization_code')}, payment_type_code={resp.get('payment_type_code')}"
+                    )
+                    await conn.execute(
+                        """
+                        INSERT INTO pago (order_id, payment_method, payment_status, transaction_id, amount, payment_date, authorization_code, payment_type_code)
+                        VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+                        """,
+                        pedido_id,
+                        resp.get("payment_type_code") or "webpay",
+                        status,
+                        resp.get("buy_order"),
+                        float(resp.get("amount", 0)),
+                        resp.get("authorization_code"),
+                        resp.get("payment_type_code"),
+                    )
+                    logger.info(
+                        f"[TBK_CONFIRM] Registro en pago insertado para pedido {pedido_id}."
+                    )
+
+                    # 3. Asegurar que detalle_pedido esté poblado
+                    detalles = await conn.fetch(
+                        "SELECT 1 FROM detalle_pedido WHERE pedido_id = $1 LIMIT 1",
+                        pedido_id,
+                    )
+                    logger.info(
+                        f"[TBK_CONFIRM] detalle_pedido existe para pedido {pedido_id}? {'SI' if detalles else 'NO'}"
+                    )
+                    if not detalles:
+                        # Si no hay detalles, intentar poblar desde carrito del cliente
+                        pedido = await conn.fetchrow(
+                            "SELECT cliente_id FROM pedido WHERE id = $1", pedido_id
+                        )
+                        if pedido:
+                            cliente_id = pedido["cliente_id"]
+                            cart = await conn.fetchrow(
+                                "SELECT id FROM Carrito WHERE cliente_id = $1",
+                                cliente_id,
+                            )
+                            if cart:
+                                cart_id = cart["id"]
+                                cart_items = await conn.fetch(
+                                    """
+                                    SELECT producto_id, quantity, total_price FROM ArticuloCarrito WHERE carrito_id = $1
+                                    """,
+                                    cart_id,
+                                )
+                                logger.info(
+                                    f"[TBK_CONFIRM] Insertando detalle_pedido para pedido {pedido_id} desde carrito {cart_id}, items: {len(cart_items)}"
+                                )
+                                for it in cart_items:
+                                    pid = it["producto_id"]
+                                    qty = max(int(it["quantity"] or 1), 1)
+                                    total_price_item = float(it["total_price"] or 0)
+                                    unit_price = (
+                                        total_price_item / qty
+                                        if qty > 0 and total_price_item > 0
+                                        else 0
+                                    )
+                                    logger.info(
+                                        f"[TBK_CONFIRM] Insertando detalle_pedido: pedido_id={pedido_id}, producto_id={pid}, cantidad={qty}, precio_unitario={unit_price}"
+                                    )
+                                    await conn.execute(
+                                        """
+                                        INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
+                                        VALUES ($1, $2, $3, $4)
+                                        ON CONFLICT (pedido_id, producto_id) DO UPDATE
+                                        SET cantidad = EXCLUDED.cantidad, precio_unitario = EXCLUDED.precio_unitario
+                                        """,
+                                        pedido_id,
+                                        pid,
+                                        qty,
+                                        unit_price,
+                                    )
+                                    # Descontar stock SOLO aquí, para no afectar otros flujos
+                                    await conn.execute(
+                                        """
+                                        UPDATE producto
+                                        SET stock_quantity = stock_quantity - $1
+                                        WHERE id = $2
+                                        """,
+                                        qty,
+                                        pid,
+                                    )
+                                logger.info(
+                                    f"[TBK_CONFIRM] detalle_pedido insertado y stock actualizado para pedido {pedido_id}."
+                                )
+
+            except Exception as e:
+                logger.error(f"Error en confirmación de pago: {e}")
+
+            # eliminar meta temporal si existe
+            pending_transactions.pop(payload.token_ws, None)
+
+            return {
+                "status": "success",
+                "pedido_id": pedido_id,
+                "buy_order": buy_order,
+                "amount": resp.get("amount"),
+                "authorization_code": resp.get("authorization_code"),
+                "payment_type_code": resp.get("payment_type_code"),
+                "response_code": resp.get("response_code"),
+                "installments_number": resp.get("installments_number"),
+            }
+        else:
+            # Si el pago fue rechazado, actualizar pedido a cancelado (si existe)
+            if buy_order and buy_order in pending_transactions:
+                transaction_data = pending_transactions[buy_order]
+                pedido_id = transaction_data.get("pedido_id")
+                if pedido_id:
+                    await conn.execute(
+                        """
+                        UPDATE pedido 
+                        SET order_status = 'cancelado',
+                            notas = 'Pago rechazado por Transbank',
+                            updated_at = NOW()
+                        WHERE id = $1
+                        """,
+                        pedido_id,
+                    )
+                    logger.info(
+                        f"Pedido {pedido_id} marcado como cancelado por pago rechazado"
+                    )
+                del pending_transactions[buy_order]
+            return {"status": "rejected", "detail": resp}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirmando transacción: {e}")
+        raise HTTPException(status_code=500, detail="Error al confirmar la transacción")
 
 
 # ==================== ENDPOINTS CHATBOT ====================
@@ -3217,7 +3483,21 @@ async def chatbot_message(
     import httpx
 
     sender_id = request.sender_id or str(datetime.now().timestamp())
-    rasa_url = os.getenv("RASA_URL", "http://localhost:5005/webhooks/rest/webhook")
+    import socket
+
+    def is_localhost_available():
+        try:
+            sock = socket.create_connection(("localhost", 5005), timeout=1)
+            sock.close()
+            return True
+        except Exception:
+            return False
+
+    default_local = "http://localhost:5005/webhooks/rest/webhook"
+    fallback = "http://physical-via.gl.at.ply.gg:18057/webhooks/rest/webhook"
+    rasa_url = os.getenv("RASA_URL", default_local)
+    if rasa_url == default_local and not is_localhost_available():
+        rasa_url = fallback
 
     # Construir metadata incluyendo cliente_id si el usuario está autenticado
     metadata = request.metadata.copy() if request.metadata else {}
@@ -3747,6 +4027,1085 @@ async def root():
             "documentacion": "/docs",
         },
     }
+
+
+# Configuración Transbank (FORZAR TEST)
+TBK_ENV = (os.getenv("TBK_ENV") or "TEST").upper()
+TBK_INTEGRATION_TYPE = IntegrationType.TEST  # forzar test
+
+# Usa constantes oficiales de integración para evitar 401
+TBK_COMMERCE_CODE = (
+    os.getenv("TBK_COMMERCE_CODE") or IntegrationCommerceCodes.WEBPAY_PLUS
+)
+TBK_API_KEY = os.getenv("TBK_API_KEY") or IntegrationApiKeys.WEBPAY
+
+if WebpayOptions:
+    TBK_OPTIONS = WebpayOptions(
+        commerce_code=TBK_COMMERCE_CODE,
+        api_key=TBK_API_KEY,
+        integration_type=TBK_INTEGRATION_TYPE,
+    )
+else:
+    TBK_OPTIONS = None
+    Transaction.commerce_code = TBK_COMMERCE_CODE
+    Transaction.api_key = TBK_API_KEY
+    Transaction.integration_type = TBK_INTEGRATION_TYPE
+
+logger.info(
+    f"Transbank TEST configured. code={TBK_COMMERCE_CODE} type={TBK_INTEGRATION_TYPE}"
+)
+
+
+# Almacenamiento temporal de transacciones
+pending_transactions = {}
+
+
+# ==================== ENDPOINTS CHATBOT ====================
+
+
+# Schemas para Chatbot
+class ChatbotMessageRequest(BaseModel):
+    message: str
+    sender_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ChatbotMessageResponse(BaseModel):
+    response: str
+    confidence: Optional[float] = None
+    intent: Optional[str] = None
+
+
+class FAQCreate(BaseModel):
+    categoria: str
+    pregunta: str
+    respuesta: str
+    keywords: Optional[List[str]] = None
+    is_active: Optional[bool] = True
+
+
+class FAQUpdate(BaseModel):
+    categoria: Optional[str] = None
+    pregunta: Optional[str] = None
+    respuesta: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class FAQResponse(BaseModel):
+    id: int
+    categoria: str
+    pregunta: str
+    respuesta: str
+    keywords: Optional[List[str]]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class TicketResponse(BaseModel):
+    id: int
+    usuario_id: Optional[int]
+    conversacion: Optional[str]
+    estado: str
+    fecha_creacion: datetime
+    fecha_resolucion: Optional[datetime]
+    notas: Optional[str]
+
+    # Campo opcional para el email del usuario (join con Cliente)
+    usuario_email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TicketUpdateEstadoRequest(BaseModel):
+    estado: str
+
+
+class TicketUpdateNotasRequest(BaseModel):
+    notas: str
+
+
+# ==================== MODELOS DE PEDIDOS ====================
+
+
+class OrderProductDetail(BaseModel):
+    producto_id: int
+    title: str
+    quantity: int
+    unit_price: float
+    subtotal: float
+
+    class Config:
+        from_attributes = True
+
+
+class OrderResponse(BaseModel):
+    id: int
+    cliente_id: int
+    order_status: str
+    shipping_address: str
+    total_price: float
+    created_at: datetime
+    updated_at: datetime
+
+    # Datos del cliente (opcional, para admin)
+    cliente_email: Optional[str] = None
+    cliente_nombre: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrderDetailResponse(BaseModel):
+    id: int
+    cliente_id: int
+    order_status: str
+    shipping_address: str
+    total_price: float
+    created_at: datetime
+    updated_at: datetime
+
+    # Datos del cliente
+    cliente_email: Optional[str] = None
+    cliente_nombre: Optional[str] = None
+
+    # Productos del pedido
+    productos: List[OrderProductDetail] = []
+
+    # Información de pago (si existe)
+    pago_estado: Optional[str] = None
+    pago_metodo: Optional[str] = None
+    pago_fecha: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrderUpdateStatusRequest(BaseModel):
+    order_status: str
+
+
+class OrderNotasRequest(BaseModel):
+    notas: str
+
+
+# Endpoint: Listar FAQs (Admin)
+@app.get("/api/admin/faqs", response_model=List[FAQResponse])
+async def list_faqs(
+    categoria: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Lista todas las FAQs. Solo para administradores.
+    """
+    # Verificar rol de administrador
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden acceder",
+        )
+
+    try:
+        query = "SELECT * FROM FAQ WHERE 1=1"
+        params = []
+        param_count = 1
+
+        if categoria:
+            query += f" AND categoria = ${param_count}"
+            params.append(categoria)
+            param_count += 1
+
+        if is_active is not None:
+            query += f" AND is_active = ${param_count}"
+            params.append(is_active)
+            param_count += 1
+
+        query += " ORDER BY categoria, id"
+
+        faqs = await db.fetch(query, *params)
+        return [dict(faq) for faq in faqs]
+
+    except Exception as e:
+        logger.error(f"Error listando FAQs: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo FAQs")
+
+
+# Endpoint: Crear FAQ (Admin)
+@app.post("/api/admin/faqs", response_model=FAQResponse)
+async def create_faq(
+    faq: FAQCreate,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Crea una nueva FAQ. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden crear FAQs",
+        )
+
+    admin_id = token_data["user_id"]
+
+    try:
+        query = """
+            INSERT INTO FAQ (categoria, pregunta, respuesta, keywords, is_active, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+        """
+        new_faq = await db.fetchrow(
+            query,
+            faq.categoria,
+            faq.pregunta,
+            faq.respuesta,
+            faq.keywords or [],
+            faq.is_active,
+            admin_id,
+        )
+
+        return dict(new_faq)
+
+    except Exception as e:
+        logger.error(f"Error creando FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Error creando FAQ")
+
+
+# Endpoint: Actualizar FAQ (Admin)
+@app.put("/api/admin/faqs/{faq_id}", response_model=FAQResponse)
+async def update_faq(
+    faq_id: int,
+    faq: FAQUpdate,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Actualiza una FAQ existente. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden editar FAQs",
+        )
+
+    try:
+        # Construir query dinámica
+        updates = []
+        params = []
+        param_count = 1
+
+        if faq.categoria is not None:
+            updates.append(f"categoria = ${param_count}")
+            params.append(faq.categoria)
+            param_count += 1
+
+        if faq.pregunta is not None:
+            updates.append(f"pregunta = ${param_count}")
+            params.append(faq.pregunta)
+            param_count += 1
+
+        if faq.respuesta is not None:
+            updates.append(f"respuesta = ${param_count}")
+            params.append(faq.respuesta)
+            param_count += 1
+
+        if faq.keywords is not None:
+            updates.append(f"keywords = ${param_count}")
+            params.append(faq.keywords)
+            param_count += 1
+
+        if faq.is_active is not None:
+            updates.append(f"is_active = ${param_count}")
+            params.append(faq.is_active)
+            param_count += 1
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+
+        updates.append(f"updated_at = CURRENT_TIMESTAMP")
+        params.append(faq_id)
+
+        query = f"""
+            UPDATE FAQ
+            SET {", ".join(updates)}
+            WHERE id = ${param_count}
+            RETURNING *
+        """
+
+        updated_faq = await db.fetchrow(query, *params)
+
+        if not updated_faq:
+            raise HTTPException(status_code=404, detail="FAQ no encontrada")
+
+        return dict(updated_faq)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando FAQ")
+
+
+# Endpoint: Eliminar FAQ (Admin)
+@app.delete("/api/admin/faqs/{faq_id}")
+async def delete_faq(
+    faq_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Elimina una FAQ. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden eliminar FAQs",
+        )
+
+    try:
+        query = "DELETE FROM FAQ WHERE id = $1 RETURNING id"
+        deleted = await db.fetchval(query, faq_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="FAQ no encontrada")
+
+        return {"mensaje": f"FAQ {faq_id} eliminada exitosamente"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error eliminando FAQ: {e}")
+        raise HTTPException(status_code=500, detail="Error eliminando FAQ")
+
+
+# Endpoint: Listar tickets (Admin)
+@app.get("/api/admin/tickets", response_model=List[TicketResponse])
+async def list_tickets(
+    estado: Optional[str] = None,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Lista todos los tickets de soporte. Solo para administradores.
+    Opcionalmente filtra por estado (pendiente, en_proceso, resuelto, cerrado).
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden ver tickets",
+        )
+
+    try:
+        # Query con LEFT JOIN para obtener email del usuario
+        query = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE 1=1
+        """
+        params = []
+
+        if estado:
+            query += " AND t.estado = $1"
+            params.append(estado)
+
+        query += " ORDER BY t.fecha_creacion DESC"
+
+        tickets = await db.fetch(query, *params)
+        return [dict(ticket) for ticket in tickets]
+
+    except Exception as e:
+        logger.error(f"Error listando tickets: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo tickets")
+
+
+# Endpoint: Obtener un ticket por ID (Admin)
+@app.get("/api/admin/tickets/{ticket_id}", response_model=TicketResponse)
+async def get_ticket(
+    ticket_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Obtiene los detalles de un ticket específico. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden ver tickets",
+        )
+
+    try:
+        query = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE t.id = $1
+        """
+
+        ticket = await db.fetchrow(query, ticket_id)
+
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+
+        return dict(ticket)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo ticket: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo ticket")
+
+
+# Endpoint: Actualizar estado de ticket (Admin)
+@app.patch("/api/admin/tickets/{ticket_id}/estado", response_model=TicketResponse)
+async def update_ticket_status(
+    ticket_id: int,
+    request: TicketUpdateEstadoRequest,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Actualiza el estado de un ticket. Solo para administradores.
+    Estados válidos: pendiente, en_proceso, resuelto, cerrado
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden actualizar tickets",
+        )
+
+    valid_estados = ["pendiente", "en_proceso", "resuelto", "cerrado"]
+    if request.estado not in valid_estados:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Estado inválido. Debe ser uno de: {', '.join(valid_estados)}",
+        )
+
+    try:
+        # Si el estado es 'resuelto' o 'cerrado', actualizar fecha_resolucion
+        if request.estado in ["resuelto", "cerrado"]:
+            query = """
+                UPDATE tickets_soporte
+                SET estado = $1, fecha_resolucion = CURRENT_TIMESTAMP
+                WHERE id = $2
+                RETURNING *
+            """
+        else:
+            query = """
+                UPDATE tickets_soporte
+                SET estado = $1, fecha_resolucion = NULL
+                WHERE id = $2
+                RETURNING *
+            """
+
+        updated_ticket = await db.fetchrow(query, request.estado, ticket_id)
+
+        if not updated_ticket:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+
+        # Obtener email del usuario
+        query_with_email = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE t.id = $1
+        """
+        ticket_with_email = await db.fetchrow(query_with_email, ticket_id)
+
+        return dict(ticket_with_email)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando ticket: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando ticket")
+
+
+# Endpoint: Agregar/actualizar notas internas de un ticket (Admin)
+@app.patch("/api/admin/tickets/{ticket_id}/notas", response_model=TicketResponse)
+async def update_ticket_notes(
+    ticket_id: int,
+    request: TicketUpdateNotasRequest,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Agrega o actualiza las notas internas de un ticket. Solo para administradores.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden actualizar notas",
+        )
+
+    try:
+        query = """
+            UPDATE tickets_soporte
+            SET notas = $1
+            WHERE id = $2
+            RETURNING *
+        """
+
+        updated_ticket = await db.fetchrow(query, request.notas, ticket_id)
+
+        if not updated_ticket:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+
+        # Obtener email del usuario
+        query_with_email = """
+            SELECT 
+                t.*,
+                c.email as usuario_email
+            FROM tickets_soporte t
+            LEFT JOIN Cliente c ON t.usuario_id = c.id
+            WHERE t.id = $1
+        """
+        ticket_with_email = await db.fetchrow(query_with_email, ticket_id)
+
+        return dict(ticket_with_email)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando notas: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando notas")
+
+
+# Endpoint: Eliminar un ticket (Admin) - opcional
+@app.delete("/api/admin/tickets/{ticket_id}")
+async def delete_ticket(
+    ticket_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Elimina un ticket. Solo para administradores. Usar con precaución.
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden eliminar tickets",
+        )
+
+    try:
+        query = "DELETE FROM tickets_soporte WHERE id = $1 RETURNING id"
+        deleted = await db.fetchrow(query, ticket_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+
+        return {"message": "Ticket eliminado correctamente", "id": deleted["id"]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error eliminando ticket: {e}")
+        raise HTTPException(status_code=500, detail="Error eliminando ticket")
+
+
+# ==================== FIN ENDPOINTS TICKETS ====================
+
+
+# ==================== ENDPOINTS PEDIDOS (ORDERS) ====================
+
+
+# Endpoint: Crear pedido desde el carrito
+@app.post("/api/pedidos", response_model=OrderDetailResponse)
+async def create_order_from_cart(
+    direccion_id: Optional[int] = None,
+    session_id: Optional[str] = None,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Crea un pedido desde el carrito actual del cliente.
+    Requiere autenticación. SOLO RETIRO EN TIENDA.
+    """
+    token_data = await get_current_user(credentials, db)
+
+    if token_data["role"] != ROLE_CLIENTE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo clientes pueden crear pedidos",
+        )
+
+    cliente_id = token_data.get("user_id")
+
+    try:
+        # Obtener carrito
+        cart_id = await get_or_create_cart(
+            db, cliente_id=cliente_id, session_id=session_id
+        )
+
+        # Obtener items del carrito
+        cart_items = await db.fetch(
+            """
+            SELECT ac.producto_id, ac.quantity, p.price, p.title, p.stock_quantity
+            FROM articulocarrito ac
+            JOIN producto p ON ac.producto_id = p.id
+            WHERE ac.carrito_id = $1 AND p.status = 'activo'
+        """,
+            cart_id,
+        )
+
+        if not cart_items:
+            raise HTTPException(status_code=400, detail="El carrito está vacío")
+
+        # Validar stock
+        for item in cart_items:
+            if item["quantity"] > item["stock_quantity"]:
+                raise HTTPException(
+                    status_code=400, detail=f"Stock insuficiente para {item['title']}"
+                )
+
+        # Calcular total
+        total_price = sum(
+            float(item["price"]) * item["quantity"] for item in cart_items
+        )
+
+        # Obtener dirección (por ahora: RETIRO EN TIENDA)
+        shipping_address = "RETIRO EN TIENDA"
+        if direccion_id:
+            direccion = await db.fetchrow(
+                "SELECT calle, nro, comuna, region FROM direccion WHERE id = $1 AND cliente_id = $2",
+                direccion_id,
+                cliente_id,
+            )
+            if direccion:
+                shipping_address = f"{direccion['calle']} {direccion['nro']}, {direccion['comuna']}, {direccion['region']}"
+
+        async with db.transaction():
+            # Crear pedido
+            pedido_id = await db.fetchval(
+                """
+                INSERT INTO pedido (cliente_id, order_status, shipping_address, total_price)
+                VALUES ($1, 'creado', $2, $3)
+                RETURNING id
+            """,
+                cliente_id,
+                shipping_address,
+                total_price,
+            )
+
+            # Insertar detalles del pedido
+            for item in cart_items:
+                await db.execute(
+                    """
+                    INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario)
+                    VALUES ($1, $2, $3, $4)
+                """,
+                    pedido_id,
+                    item["producto_id"],
+                    item["quantity"],
+                    float(item["price"]),
+                )
+
+                # Reducir stock
+                await db.execute(
+                    """
+                    UPDATE producto 
+                    SET stock_quantity = stock_quantity - $1
+                    WHERE id = $2
+                """,
+                    item["quantity"],
+                    item["producto_id"],
+                )
+
+            # Limpiar carrito
+            await db.execute(
+                "DELETE FROM articulocarrito WHERE carrito_id = $1", cart_id
+            )
+
+            # Obtener pedido completo para respuesta
+            pedido = await db.fetchrow(
+                """
+                SELECT p.*, c.email as cliente_email, c.first_name || ' ' || c.last_name as cliente_nombre
+                FROM pedido p
+                JOIN cliente c ON p.cliente_id = c.id
+                WHERE p.id = $1
+            """,
+                pedido_id,
+            )
+
+            # Obtener productos
+            productos = await db.fetch(
+                """
+                  SELECT dp.producto_id, pr.title, dp.cantidad, dp.precio_unitario,
+                      (dp.cantidad * dp.precio_unitario) as subtotal
+                FROM detalle_pedido dp
+                JOIN producto pr ON dp.producto_id = pr.id
+                WHERE dp.pedido_id = $1
+            """,
+                pedido_id,
+            )
+
+            result = dict(pedido)
+            result["productos"] = [dict(p) for p in productos]
+
+            return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creando pedido: {e}")
+        raise HTTPException(status_code=500, detail="Error al crear el pedido")
+
+
+# Endpoint: Listar todos los pedidos (Admin)
+@app.get("/api/admin/orders", response_model=List[OrderResponse])
+async def list_orders(
+    estado: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Lista todos los pedidos. Solo para administradores.
+    Opcionalmente filtrar por estado: creado, pagado, preparando, enviado, en_transito, entregado, cancelado
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden ver pedidos",
+        )
+
+    try:
+        # Construir query con filtro opcional de estado
+        query = """
+            SELECT 
+                p.*,
+                c.email as cliente_email,
+                c.first_name || ' ' || c.last_name as cliente_nombre
+            FROM pedido p
+            JOIN cliente c ON p.cliente_id = c.id
+        """
+        params = []
+
+        if estado:
+            query += " WHERE p.order_status = $1"
+            params.append(estado)
+            query += " ORDER BY p.created_at DESC LIMIT $2 OFFSET $3"
+            params.extend([limit, skip])
+        else:
+            query += " ORDER BY p.created_at DESC LIMIT $1 OFFSET $2"
+            params.extend([limit, skip])
+
+        orders = await db.fetch(query, *params)
+        return [dict(order) for order in orders]
+
+    except Exception as e:
+        logger.error(f"Error listando pedidos: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo pedidos")
+
+
+# Endpoint: Obtener detalles de un pedido (Admin o Cliente propietario)
+@app.get("/api/admin/orders/{order_id}", response_model=OrderDetailResponse)
+async def get_order_detail(
+    order_id: int,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Obtiene los detalles completos de un pedido incluyendo productos y pago.
+    Admin puede ver cualquier pedido, Cliente solo sus propios pedidos.
+    """
+    token_data = await get_current_user(credentials, db)
+
+    try:
+        # Obtener datos básicos del pedido
+        query = """
+            SELECT 
+                p.*,
+                c.email as cliente_email,
+                c.first_name || ' ' || c.last_name as cliente_nombre
+            FROM pedido p
+            JOIN cliente c ON p.cliente_id = c.id
+            WHERE p.id = $1
+        """
+
+        order = await db.fetchrow(query, order_id)
+
+        if not order:
+            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+        # Verificar permisos: Admin puede ver todo, Cliente solo sus pedidos
+        if token_data["role"] != ROLE_ADMIN and order["cliente_id"] != token_data.get(
+            "user_id"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso para ver este pedido",
+            )
+
+        # Obtener productos del pedido
+        productos_query = """
+            SELECT 
+                dp.producto_id,
+                pr.title,
+                dp.cantidad,
+                dp.precio_unitario,
+                (dp.cantidad * dp.precio_unitario) as subtotal
+            FROM detalle_pedido dp
+            JOIN producto pr ON dp.producto_id = pr.id
+            WHERE dp.pedido_id = $1
+            ORDER BY dp.producto_id
+        """
+        productos = await db.fetch(productos_query, order_id)
+
+        # Obtener información de pago (si existe)
+        pago_query = """
+            SELECT payment_status, payment_method, payment_date
+            FROM pago
+            WHERE order_id = $1
+            ORDER BY payment_date DESC
+            LIMIT 1
+        """
+        pago = await db.fetchrow(pago_query, order_id)
+
+        # Construir respuesta
+        order_dict = dict(order)
+        order_dict["productos"] = [dict(p) for p in productos]
+
+        if pago:
+            order_dict["pago_estado"] = pago["payment_status"]
+            order_dict["pago_metodo"] = pago["payment_method"]
+            order_dict["pago_fecha"] = pago["payment_date"]
+
+        return order_dict
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo detalle del pedido: {e}")
+        raise HTTPException(
+            status_code=500, detail="Error obteniendo detalles del pedido"
+        )
+
+
+# Endpoint: Actualizar estado de un pedido (Admin)
+@app.patch("/api/admin/orders/{order_id}/status", response_model=OrderResponse)
+async def update_order_status(
+    order_id: int,
+    request: OrderUpdateStatusRequest,
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Actualiza el estado de un pedido. Solo para administradores.
+    Estados válidos: creado, en preparación, listo para retiro, entregado, cancelado
+    """
+    token_data = await get_current_user(credentials, db)
+    if token_data["role"] != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden actualizar estado de pedidos",
+        )
+
+    # Validar estado - SOLO RETIRO EN TIENDA
+    estados_validos = [
+        "creado",
+        "en preparación",
+        "listo para retiro",
+        "entregado",
+        "cancelado",
+    ]
+    if request.order_status not in estados_validos:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Estado inválido. Estados válidos: {', '.join(estados_validos)}",
+        )
+
+    try:
+        query = """
+            UPDATE pedido
+            SET order_status = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
+            RETURNING *
+        """
+
+        updated_order = await db.fetchrow(query, request.order_status, order_id)
+
+        if not updated_order:
+            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+        # Obtener datos completos con información del cliente
+        query_with_client = """
+            SELECT 
+                p.*,
+                c.email as cliente_email,
+                c.first_name || ' ' || c.last_name as cliente_nombre
+            FROM pedido p
+            JOIN cliente c ON p.cliente_id = c.id
+            WHERE p.id = $1
+        """
+
+        order_with_client = await db.fetchrow(query_with_client, order_id)
+
+        return dict(order_with_client)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error actualizando estado del pedido: {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando estado")
+
+
+# Endpoint: Obtener pedidos del cliente autenticado
+@app.get("/api/cliente/mis-pedidos", response_model=List[OrderDetailResponse])
+async def get_my_orders(
+    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    """
+    Obtiene todos los pedidos del cliente autenticado con sus detalles.
+    """
+    token_data = await get_current_user(credentials, db)
+
+    if token_data["role"] != ROLE_CLIENTE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este endpoint es solo para clientes",
+        )
+
+    cliente_id = token_data.get("user_id")
+
+    try:
+        # Obtener pedidos del cliente
+        query = """
+            SELECT 
+                p.*,
+                c.email as cliente_email,
+                c.first_name || ' ' || c.last_name as cliente_nombre
+            FROM pedido p
+            JOIN cliente c ON p.cliente_id = c.id
+            WHERE p.cliente_id = $1
+            ORDER BY p.created_at DESC
+        """
+
+        orders = await db.fetch(query, cliente_id)
+
+        result = []
+
+        for order in orders:
+            order_dict = dict(order)
+
+            # Obtener productos de cada pedido
+            productos_query = """
+                SELECT 
+                    dp.producto_id,
+                    pr.title,
+                    dp.cantidad,
+                    dp.precio_unitario,
+                    (dp.cantidad * dp.precio_unitario) as subtotal
+                FROM detalle_pedido dp
+                JOIN producto pr ON dp.producto_id = pr.id
+                WHERE dp.pedido_id = $1
+                ORDER BY dp.producto_id
+            """
+            productos = await db.fetch(productos_query, order_dict["id"])
+            order_dict["productos"] = [dict(p) for p in productos]
+
+            # Obtener info de pago
+            pago_query = """
+                SELECT payment_status, payment_method, payment_date
+                FROM pago
+                WHERE order_id = $1
+                ORDER BY payment_date DESC
+                LIMIT 1
+            """
+            pago = await db.fetchrow(pago_query, order_dict["id"])
+
+            if pago:
+                order_dict["pago_estado"] = pago["payment_status"]
+                order_dict["pago_metodo"] = pago["payment_method"]
+                order_dict["pago_fecha"] = pago["payment_date"]
+
+            result.append(order_dict)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error obteniendo pedidos del cliente: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo tus pedidos")
+
+
+# ==================== FIN ENDPOINTS PEDIDOS ====================
+
+
+# ==================== CONFIGURACIÓN DE LA TIENDA ====================
+class StoreConfig(BaseModel):
+    store_name: str
+    logo_url: Optional[str] = None
+    header_color: str
+
+
+@app.get("/api/public/store-config", response_model=StoreConfig)
+async def get_store_config(conn=Depends(get_db)):
+    row = await conn.fetchrow(
+        "SELECT store_name, logo_url, header_color FROM store_config ORDER BY id ASC LIMIT 1"
+    )
+    if not row:
+        return {"store_name": "Mi Tienda", "logo_url": None, "header_color": "#111827"}
+    return dict(row)
+
+
+@app.put("/api/admin/store-config", response_model=StoreConfig)
+async def update_store_config(
+    cfg: StoreConfig,
+    conn=Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    existing = await conn.fetchrow(
+        "SELECT id FROM store_config ORDER BY id ASC LIMIT 1"
+    )
+    if existing:
+        await conn.execute(
+            """
+            UPDATE store_config
+            SET store_name=$1, logo_url=$2, header_color=$3, updated_at=NOW()
+            WHERE id=$4
+            """,
+            cfg.store_name,
+            cfg.logo_url,
+            cfg.header_color,
+            existing["id"],
+        )
+    else:
+        await conn.execute(
+            """
+            INSERT INTO store_config (store_name, logo_url, header_color)
+            VALUES ($1, $2, $3)
+            """,
+            cfg.store_name,
+            cfg.logo_url,
+            cfg.header_color,
+        )
+    row = await conn.fetchrow(
+        "SELECT store_name, logo_url, header_color FROM store_config ORDER BY id ASC LIMIT 1"
+    )
+    return dict(row)
 
 
 # Lifecycle

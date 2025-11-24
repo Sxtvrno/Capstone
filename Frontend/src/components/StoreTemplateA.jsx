@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CartContext } from "../contexts/CartContext";
-import { productAPI } from "../services/api";
+import { productAPI, getStoreConfig } from "../services/api";
 
 export default function StoreTemplateA({
   products = [],
-  storeName = "Mi Tienda",
+  storeName: storeNameProp,
   logo,
   icon,
   logoSrc,
@@ -17,6 +17,18 @@ export default function StoreTemplateA({
   const [imagesMap, setImagesMap] = useState({});
   const [sortOrder, setSortOrder] = useState("nuevo");
   const [toast, setToast] = useState({ show: false, message: "" });
+  const [storeName, setStoreName] = useState(storeNameProp);
+
+  // Cargar configuración de tienda desde BD
+  useEffect(() => {
+    getStoreConfig()
+      .then((config) => {
+        if (config?.store_name) {
+          setStoreName(config.store_name);
+        }
+      })
+      .catch((err) => console.error("Error loading store config:", err));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,7 +207,14 @@ export default function StoreTemplateA({
             const title = p.name || p.title || "Producto";
             const price =
               p.price != null && !Number.isNaN(Number(p.price))
-                ? Number(p.price).toFixed(0)
+                ? Number(p.price)
+                : null;
+            const formattedPrice =
+              price != null
+                ? price.toLocaleString("es-CL", {
+                  style: "currency",
+                  currency: "CLP",
+                })
                 : null;
 
             return (
@@ -240,9 +259,9 @@ export default function StoreTemplateA({
                     </p>
                   )}
                   <div className="mt-3 flex items-center justify-between">
-                    {price ? (
+                    {formattedPrice ? (
                       <span className="text-base font-semibold text-gray-900">
-                        ${price}
+                        {formattedPrice}
                       </span>
                     ) : (
                       <span className="text-sm text-gray-500">Sin precio</span>
@@ -277,20 +296,20 @@ export default function StoreTemplateA({
         </div>
       </footer>
 
-      <style jsx>{`
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
+      <style>{`
+         @keyframes slide-up {
+           from {
+             transform: translateY(100%);
+             opacity: 0;
+           }
+           to {
+             transform: translateY(0);
+             opacity: 1;
+           }
+         }
+         .animate-slide-up {
+           animation: slide-up 0.3s ease-out;
+         }
       `}</style>
     </div>
   );

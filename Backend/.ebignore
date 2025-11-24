@@ -1,3 +1,5 @@
+# Excluir carpeta chatbot
+chatbot/
 # Git/IDE
 
 .git/

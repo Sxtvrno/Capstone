@@ -1,0 +1,304 @@
+2025-10-07 23:22:31,622 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:22:31,627 [INFO] Running configSets: _OnInstanceBoot
+2025-10-07 23:22:31,630 [INFO] Running configSet _OnInstanceBoot
+2025-10-07 23:22:31,632 [INFO] Running config AWSEBBaseConfig
+2025-10-07 23:22:31,880 [INFO] Command clearbackupfiles succeeded
+2025-10-07 23:22:31,883 [INFO] Running config AWSEBCfnHupEndpointOverride
+2025-10-07 23:22:31,887 [INFO] Command clearbackupfiles succeeded
+2025-10-07 23:22:31,888 [INFO] ConfigSets completed
+2025-10-07 23:22:31,889 [INFO] -----------------------Build complete-----------------------
+2025-10-07 23:23:38,201 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:23:38,205 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-07 23:23:38,208 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-07 23:23:38,211 [INFO] Running config prebuild_0_Back
+2025-10-07 23:23:53,367 [ERROR] postgresql-devel is not available to be installed
+2025-10-07 23:23:53,368 [ERROR] Error encountered during build of prebuild_0_Back: Yum does not have postgresql-devel available for installation
+Traceback (most recent call last):
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 579, in run_config
+    CloudFormationCarpenter(config, self._auth_config, self.strict_mode).build(worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 244, in build
+    changes['packages'][manager] = CloudFormationCarpenter._packageTools[manager]().apply(packages,
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/rpm_tools.py", line 80, in apply
+    raise ToolError("Yum does not have %s available for installation" % pkg_spec)
+cfnbootstrap.construction_errors.ToolError: Yum does not have postgresql-devel available for installation
+2025-10-07 23:23:53,370 [ERROR] -----------------------BUILD FAILED!------------------------
+2025-10-07 23:23:53,370 [ERROR] Unhandled exception during build: Yum does not have postgresql-devel available for installation
+Traceback (most recent call last):
+  File "/opt/aws/bin/cfn-init", line 181, in <module>
+    worklog.build(metadata, configSets, strict_mode)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 137, in build
+    Contractor(metadata, strict_mode).build(configSets, self)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 567, in build
+    self.run_config(config, worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 579, in run_config
+    CloudFormationCarpenter(config, self._auth_config, self.strict_mode).build(worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 244, in build
+    changes['packages'][manager] = CloudFormationCarpenter._packageTools[manager]().apply(packages,
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/rpm_tools.py", line 80, in apply
+    raise ToolError("Yum does not have %s available for installation" % pkg_spec)
+cfnbootstrap.construction_errors.ToolError: Yum does not have postgresql-devel available for installation
+2025-10-07 23:40:11,060 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:40:11,065 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-07 23:40:11,067 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-07 23:40:11,069 [INFO] Running config prebuild_0_Back
+2025-10-07 23:40:25,681 [ERROR] postgresql-devel is not available to be installed
+2025-10-07 23:40:25,681 [ERROR] Error encountered during build of prebuild_0_Back: Yum does not have postgresql-devel available for installation
+Traceback (most recent call last):
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 579, in run_config
+    CloudFormationCarpenter(config, self._auth_config, self.strict_mode).build(worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 244, in build
+    changes['packages'][manager] = CloudFormationCarpenter._packageTools[manager]().apply(packages,
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/rpm_tools.py", line 80, in apply
+    raise ToolError("Yum does not have %s available for installation" % pkg_spec)
+cfnbootstrap.construction_errors.ToolError: Yum does not have postgresql-devel available for installation
+2025-10-07 23:40:25,681 [ERROR] -----------------------BUILD FAILED!------------------------
+2025-10-07 23:40:25,682 [ERROR] Unhandled exception during build: Yum does not have postgresql-devel available for installation
+Traceback (most recent call last):
+  File "/opt/aws/bin/cfn-init", line 181, in <module>
+    worklog.build(metadata, configSets, strict_mode)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 137, in build
+    Contractor(metadata, strict_mode).build(configSets, self)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 567, in build
+    self.run_config(config, worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 579, in run_config
+    CloudFormationCarpenter(config, self._auth_config, self.strict_mode).build(worklog)
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/construction.py", line 244, in build
+    changes['packages'][manager] = CloudFormationCarpenter._packageTools[manager]().apply(packages,
+  File "/usr/lib/python3.9/site-packages/cfnbootstrap/rpm_tools.py", line 80, in apply
+    raise ToolError("Yum does not have %s available for installation" % pkg_spec)
+cfnbootstrap.construction_errors.ToolError: Yum does not have postgresql-devel available for installation
+2025-10-07 23:43:27,066 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:43:27,071 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-07 23:43:27,073 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-07 23:43:27,073 [INFO] ConfigSets completed
+2025-10-07 23:43:27,073 [INFO] -----------------------Build complete-----------------------
+2025-10-07 23:43:40,479 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:43:40,485 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-07 23:43:40,488 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-07 23:43:40,488 [INFO] ConfigSets completed
+2025-10-07 23:43:40,488 [INFO] -----------------------Build complete-----------------------
+2025-10-07 23:51:52,495 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:51:52,500 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-07 23:51:52,502 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-07 23:51:52,502 [INFO] ConfigSets completed
+2025-10-07 23:51:52,502 [INFO] -----------------------Build complete-----------------------
+2025-10-07 23:51:56,536 [INFO] -----------------------Starting build-----------------------
+2025-10-07 23:51:56,541 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-07 23:51:56,543 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-07 23:51:56,543 [INFO] ConfigSets completed
+2025-10-07 23:51:56,543 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:32:55,638 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:32:55,644 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-20 23:32:55,646 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-20 23:32:55,646 [INFO] ConfigSets completed
+2025-10-20 23:32:55,646 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:35:31,204 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:35:31,209 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-20 23:35:31,212 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-20 23:35:31,212 [INFO] ConfigSets completed
+2025-10-20 23:35:31,212 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:36:59,223 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:36:59,230 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-20 23:36:59,232 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-20 23:36:59,232 [INFO] ConfigSets completed
+2025-10-20 23:36:59,232 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:37:05,862 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:37:05,867 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-20 23:37:05,870 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-20 23:37:05,870 [INFO] ConfigSets completed
+2025-10-20 23:37:05,870 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:39:45,749 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:39:45,754 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-20 23:39:45,755 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-20 23:39:45,756 [INFO] ConfigSets completed
+2025-10-20 23:39:45,756 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:39:50,546 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:39:50,550 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-20 23:39:50,552 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-20 23:39:50,552 [INFO] ConfigSets completed
+2025-10-20 23:39:50,552 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:43:01,594 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:43:01,605 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-20 23:43:01,611 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-20 23:43:01,612 [INFO] ConfigSets completed
+2025-10-20 23:43:01,612 [INFO] -----------------------Build complete-----------------------
+2025-10-20 23:43:07,037 [INFO] -----------------------Starting build-----------------------
+2025-10-20 23:43:07,042 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-20 23:43:07,044 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-20 23:43:07,045 [INFO] ConfigSets completed
+2025-10-20 23:43:07,045 [INFO] -----------------------Build complete-----------------------
+2025-10-21 00:00:41,864 [INFO] -----------------------Starting build-----------------------
+2025-10-21 00:00:41,868 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 00:00:41,870 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 00:00:41,871 [INFO] ConfigSets completed
+2025-10-21 00:00:41,871 [INFO] -----------------------Build complete-----------------------
+2025-10-21 00:00:46,334 [INFO] -----------------------Starting build-----------------------
+2025-10-21 00:00:46,339 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 00:00:46,342 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 00:00:46,342 [INFO] ConfigSets completed
+2025-10-21 00:00:46,342 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:17:16,716 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:17:16,720 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 01:17:16,723 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 01:17:16,723 [INFO] ConfigSets completed
+2025-10-21 01:17:16,723 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:17:21,292 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:17:21,297 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 01:17:21,299 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 01:17:21,299 [INFO] ConfigSets completed
+2025-10-21 01:17:21,299 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:20:53,121 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:20:53,125 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 01:20:53,128 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 01:20:53,128 [INFO] ConfigSets completed
+2025-10-21 01:20:53,128 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:20:57,632 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:20:57,637 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 01:20:57,639 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 01:20:57,639 [INFO] ConfigSets completed
+2025-10-21 01:20:57,640 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:24:05,470 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:24:05,475 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 01:24:05,477 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 01:24:05,477 [INFO] ConfigSets completed
+2025-10-21 01:24:05,477 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:24:10,077 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:24:10,081 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 01:24:10,084 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 01:24:10,084 [INFO] ConfigSets completed
+2025-10-21 01:24:10,084 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:25:49,947 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:25:49,952 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 01:25:49,954 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 01:25:49,954 [INFO] ConfigSets completed
+2025-10-21 01:25:49,954 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:25:54,586 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:25:54,591 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 01:25:54,594 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 01:25:54,594 [INFO] ConfigSets completed
+2025-10-21 01:25:54,594 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:44:42,708 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:44:42,713 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 01:44:42,715 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 01:44:42,716 [INFO] ConfigSets completed
+2025-10-21 01:44:42,716 [INFO] -----------------------Build complete-----------------------
+2025-10-21 01:44:47,209 [INFO] -----------------------Starting build-----------------------
+2025-10-21 01:44:47,214 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 01:44:47,216 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 01:44:47,216 [INFO] ConfigSets completed
+2025-10-21 01:44:47,216 [INFO] -----------------------Build complete-----------------------
+2025-10-21 02:08:33,190 [INFO] -----------------------Starting build-----------------------
+2025-10-21 02:08:33,196 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 02:08:33,198 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 02:08:33,198 [INFO] ConfigSets completed
+2025-10-21 02:08:33,198 [INFO] -----------------------Build complete-----------------------
+2025-10-21 02:08:38,098 [INFO] -----------------------Starting build-----------------------
+2025-10-21 02:08:38,103 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 02:08:38,105 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 02:08:38,105 [INFO] ConfigSets completed
+2025-10-21 02:08:38,105 [INFO] -----------------------Build complete-----------------------
+2025-10-21 02:11:49,006 [INFO] -----------------------Starting build-----------------------
+2025-10-21 02:11:49,011 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 02:11:49,013 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 02:11:49,013 [INFO] ConfigSets completed
+2025-10-21 02:11:49,014 [INFO] -----------------------Build complete-----------------------
+2025-10-21 02:11:53,424 [INFO] -----------------------Starting build-----------------------
+2025-10-21 02:11:53,429 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 02:11:53,431 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 02:11:53,431 [INFO] ConfigSets completed
+2025-10-21 02:11:53,431 [INFO] -----------------------Build complete-----------------------
+2025-10-21 02:15:43,136 [INFO] -----------------------Starting build-----------------------
+2025-10-21 02:15:43,140 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 02:15:43,143 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 02:15:43,143 [INFO] ConfigSets completed
+2025-10-21 02:15:43,143 [INFO] -----------------------Build complete-----------------------
+2025-10-21 02:15:47,576 [INFO] -----------------------Starting build-----------------------
+2025-10-21 02:15:47,580 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 02:15:47,583 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 02:15:47,583 [INFO] ConfigSets completed
+2025-10-21 02:15:47,583 [INFO] -----------------------Build complete-----------------------
+2025-10-21 03:36:19,612 [INFO] -----------------------Starting build-----------------------
+2025-10-21 03:36:19,617 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-21 03:36:19,619 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-21 03:36:19,620 [INFO] ConfigSets completed
+2025-10-21 03:36:19,620 [INFO] -----------------------Build complete-----------------------
+2025-10-21 03:36:24,019 [INFO] -----------------------Starting build-----------------------
+2025-10-21 03:36:24,024 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-21 03:36:24,026 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-21 03:36:24,026 [INFO] ConfigSets completed
+2025-10-21 03:36:24,027 [INFO] -----------------------Build complete-----------------------
+2025-10-28 17:24:39,268 [INFO] -----------------------Starting build-----------------------
+2025-10-28 17:24:39,273 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-28 17:24:39,275 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-28 17:24:39,275 [INFO] ConfigSets completed
+2025-10-28 17:24:39,275 [INFO] -----------------------Build complete-----------------------
+2025-10-28 17:24:45,082 [INFO] -----------------------Starting build-----------------------
+2025-10-28 17:24:45,087 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-28 17:24:45,089 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-28 17:24:45,089 [INFO] ConfigSets completed
+2025-10-28 17:24:45,090 [INFO] -----------------------Build complete-----------------------
+2025-10-28 18:00:59,821 [INFO] -----------------------Starting build-----------------------
+2025-10-28 18:00:59,826 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-28 18:00:59,829 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-28 18:00:59,829 [INFO] ConfigSets completed
+2025-10-28 18:00:59,829 [INFO] -----------------------Build complete-----------------------
+2025-10-28 18:01:06,100 [INFO] -----------------------Starting build-----------------------
+2025-10-28 18:01:06,105 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-28 18:01:06,108 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-28 18:01:06,108 [INFO] ConfigSets completed
+2025-10-28 18:01:06,108 [INFO] -----------------------Build complete-----------------------
+2025-10-29 22:41:08,942 [INFO] -----------------------Starting build-----------------------
+2025-10-29 22:41:08,947 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-29 22:41:08,949 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-29 22:41:08,950 [INFO] ConfigSets completed
+2025-10-29 22:41:08,950 [INFO] -----------------------Build complete-----------------------
+2025-10-29 22:41:13,545 [INFO] -----------------------Starting build-----------------------
+2025-10-29 22:41:13,549 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-29 22:41:13,552 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-29 22:41:13,552 [INFO] ConfigSets completed
+2025-10-29 22:41:13,552 [INFO] -----------------------Build complete-----------------------
+2025-10-29 22:49:31,126 [INFO] -----------------------Starting build-----------------------
+2025-10-29 22:49:31,131 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-29 22:49:31,133 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-29 22:49:31,133 [INFO] ConfigSets completed
+2025-10-29 22:49:31,134 [INFO] -----------------------Build complete-----------------------
+2025-10-29 22:49:35,843 [INFO] -----------------------Starting build-----------------------
+2025-10-29 22:49:35,847 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-29 22:49:35,850 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-29 22:49:35,850 [INFO] ConfigSets completed
+2025-10-29 22:49:35,850 [INFO] -----------------------Build complete-----------------------
+2025-10-30 00:11:04,500 [INFO] -----------------------Starting build-----------------------
+2025-10-30 00:11:04,505 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-30 00:11:04,507 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-30 00:11:04,507 [INFO] ConfigSets completed
+2025-10-30 00:11:04,507 [INFO] -----------------------Build complete-----------------------
+2025-10-30 00:15:04,455 [INFO] -----------------------Starting build-----------------------
+2025-10-30 00:15:04,460 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-10-30 00:15:04,462 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-10-30 00:15:04,462 [INFO] ConfigSets completed
+2025-10-30 00:15:04,462 [INFO] -----------------------Build complete-----------------------
+2025-10-30 00:15:09,093 [INFO] -----------------------Starting build-----------------------
+2025-10-30 00:15:09,098 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-10-30 00:15:09,101 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-10-30 00:15:09,101 [INFO] ConfigSets completed
+2025-10-30 00:15:09,101 [INFO] -----------------------Build complete-----------------------
+2025-11-03 22:41:59,491 [INFO] -----------------------Starting build-----------------------
+2025-11-03 22:41:59,497 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-11-03 22:41:59,499 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-11-03 22:41:59,499 [INFO] ConfigSets completed
+2025-11-03 22:41:59,499 [INFO] -----------------------Build complete-----------------------
+2025-11-03 22:42:06,313 [INFO] -----------------------Starting build-----------------------
+2025-11-03 22:42:06,318 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-11-03 22:42:06,320 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-11-03 22:42:06,320 [INFO] ConfigSets completed
+2025-11-03 22:42:06,320 [INFO] -----------------------Build complete-----------------------
+2025-11-05 01:11:36,509 [INFO] -----------------------Starting build-----------------------
+2025-11-05 01:11:36,514 [INFO] Running configSets: Infra-EmbeddedPreBuild
+2025-11-05 01:11:36,516 [INFO] Running configSet Infra-EmbeddedPreBuild
+2025-11-05 01:11:36,517 [INFO] ConfigSets completed
+2025-11-05 01:11:36,517 [INFO] -----------------------Build complete-----------------------
+2025-11-05 01:11:41,406 [INFO] -----------------------Starting build-----------------------
+2025-11-05 01:11:41,411 [INFO] Running configSets: Infra-EmbeddedPostBuild
+2025-11-05 01:11:41,413 [INFO] Running configSet Infra-EmbeddedPostBuild
+2025-11-05 01:11:41,413 [INFO] ConfigSets completed
+2025-11-05 01:11:41,413 [INFO] -----------------------Build complete-----------------------

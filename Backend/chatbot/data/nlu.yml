@@ -101,6 +101,27 @@ nlu:
       - información del pedido [2023](pedido_id)
       - ver mi pedido
       - consultar orden
+      - estado pedido [123](pedido_id)
+      - tracking pedido [321](pedido_id)
+      - mi orden [555](pedido_id)
+      - cómo va mi pedido [999](pedido_id)
+      - detalles del pedido [147](pedido_id)
+      - ver estado pedido [258](pedido_id)
+      - donde va mi compra
+      - ha llegado mi pedido
+      - mi compra ya salió
+      - se envió mi pedido
+      - ya despacharon mi pedido
+      - pedido entregado
+      - revisar mi orden
+      - historial de pedidos
+      - último pedido
+      - pedidos anteriores
+      - rastrear el número [741](pedido_id)
+      - consultar estado orden [852](pedido_id)
+      - info pedido [963](pedido_id)
+      - estado de compra [159](pedido_id)
+      - seguimiento orden [753](pedido_id)
 
   # Escalar a humano
   - intent: hablar_humano

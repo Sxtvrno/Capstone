@@ -1,7 +1,14 @@
 import axios from "axios";
 
 // Configuración base
-export const API_URL = import.meta.env.VITE_BACK_URL || "http://localhost:8001";
+
+// Unificar variable de entorno para la URL base de la API
+export const API_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_BACK_URL ||
+  (window.location.hostname === "localhost"
+    ? "http://localhost:8001"
+    : "http://capstone-api-env.eba-u93fpfjr.us-east-1.elasticbeanstalk.com");
 
 // Configurar interceptor para agregar token automáticamente
 axios.interceptors.request.use(
@@ -454,43 +461,86 @@ export const emailAPI = {
   },
 };
 
-const BASE_URL = import.meta.env.VITE_BACK_URL || "http://localhost:8001";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (window.location.hostname === "localhost"
+    ? "http://localhost:8001"
+    : "https://d10nrn1yj450xr.cloudfront.net");
 
-function getAuthHeaders() {
-  const token =
-    localStorage.getItem("access_token") || localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
+function getStoredToken() {
+  return (
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("authToken") ||
+    (() => {
+      const authRaw = localStorage.getItem("auth");
+      if (!authRaw) return null;
+      try {
+        const authObj = JSON.parse(authRaw);
+        return authObj?.token || authObj?.accessToken || null;
+      } catch {
+        return null;
+      }
+    })()
+  );
+}
+
+function authHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  const token = getStoredToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
 export const transbankAPI = {
-  async createTransaction({ amount, sessionId, returnUrl, pedidoId }) {
-    const body = {
-      amount: Math.max(1, Math.trunc(Number(amount) || 0)),
-      session_id: sessionId || null,
-      return_url: returnUrl || null,
-      pedido_id: pedidoId || null,
-    };
-    const res = await fetch(`${BASE_URL}/api/transbank/create`, {
+  async createTransaction(payload = {}) {
+    const headers = authHeaders();
+    // si hay sessionId en localStorage, añadirlo al body para carritos anónimos
+    const sessionId = localStorage.getItem("cart.sessionId");
+    const body = { ...payload };
+    if (sessionId) body.session_id = sessionId;
+
+    console.info(
+      "[transbankAPI.createTransaction] url:",
+      `${API_BASE}/api/transbank/create`
+    );
+    console.info("[transbankAPI.createTransaction] headers:", headers);
+    console.info("[transbankAPI.createTransaction] body:", body);
+
+    const res = await fetch(`${API_BASE}/api/transbank/create`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      headers,
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      let msg = "Error al crear transacción";
-      try {
-        const t = await res.json();
-        msg = t.detail || JSON.stringify(t);
-      } catch {}
-      throw new Error(msg);
+
+    const text = await res.text();
+    try {
+      const data = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(JSON.stringify(data || text));
+      return data;
+    } catch (e) {
+      // respuesta no JSON o error parseando
+      if (!res.ok)
+        throw new Error(`Transbank create failed ${res.status}: ${text}`);
+      return text;
     }
-    return res.json();
   },
 
-  async confirmTransaction(tokenWs) {
-    const res = await fetch(`${BASE_URL}/api/transbank/confirm`, {
+  async confirmTransaction(token_ws) {
+    const headers = authHeaders();
+    headers["Accept"] = "application/json";
+
+    console.info(
+      "[transbankAPI.confirmTransaction] url:",
+      `${API_BASE}/api/transbank/confirm`,
+      "body:",
+      { token_ws }
+    );
+
+    const res = await fetch(`${API_BASE}/api/transbank/confirm`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token_ws: tokenWs }),
+      headers,
+      body: JSON.stringify({ token_ws }),
     });
     if (!res.ok) {
       const t = await res.json().catch(() => ({}));
@@ -558,7 +608,6 @@ export const orderAPI = {
     return response.data;
   },
 };
-
 // API de Tickets de Soporte
 export const ticketsAPI = {
   // Obtener todos los tickets (con filtro opcional de estado)
@@ -626,6 +675,64 @@ export const ticketsAPI = {
   },
 };
 
+// ==================== ORDERS API ====================
+export const ordersAPI = {
+  // Listar todos los pedidos (Admin)
+  async getAll(estado = null) {
+    try {
+      const params = {};
+      if (estado && estado !== "todos") {
+        params.estado = estado;
+      }
+      const response = await axios.get(`${API_URL}/api/admin/orders`, {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error al obtener pedidos:", error);
+      throw error;
+    }
+  },
+
+  // Obtener detalle de un pedido (Admin o Cliente propietario)
+  async getById(id) {
+    try {
+      const response = await axios.get(`${API_URL}/api/admin/orders/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error al obtener pedido ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Actualizar estado de un pedido (Admin)
+  async updateStatus(id, nuevoEstado) {
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/admin/orders/${id}/status`,
+        {
+          order_status: nuevoEstado,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error al actualizar estado del pedido ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Obtener pedidos del cliente autenticado
+  async getMyOrders() {
+    try {
+      const response = await axios.get(`${API_URL}/api/cliente/mis-pedidos`);
+      return response.data;
+    } catch (error) {
+      console.error("Error al obtener mis pedidos:", error);
+      throw error;
+    }
+  },
+};
+
 // Exportar funciones legacy para compatibilidad (deprecadas)
 export const login = authAPI.login;
 export const register = authAPI.register;
@@ -672,3 +779,27 @@ export default {
   orderAPI,
   API_URL,
 };
+
+
+export async function getStoreConfig() {
+  const res = await fetch(`${API_URL}/api/public/store-config`);
+  if (!res.ok) throw new Error("Error obteniendo configuración de tienda");
+  return await res.json();
+}
+
+export async function updateStoreConfig(cfg, token) {
+  const res = await fetch(`${API_URL}/api/admin/store-config`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      store_name: cfg.store_name,
+      logo_url: cfg.logo_url,
+      header_color: cfg.header_color,
+    }),
+  });
+  if (!res.ok) throw new Error("Error actualizando configuración");
+  return await res.json();
+}

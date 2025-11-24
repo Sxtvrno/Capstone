@@ -1,0 +1,69 @@
+{
+  "type": "MaxHistoryTrackerFeaturizer",
+  "state_featurizer": {
+    "action_texts": [],
+    "entity_tag_specs": [],
+    "feature_states": {
+      "intent": {
+        "affirm": 0,
+        "agradecer": 1,
+        "ayuda": 2,
+        "back": 3,
+        "bot_challenge": 4,
+        "consultar_pedido": 5,
+        "deny": 6,
+        "faq": 7,
+        "goodbye": 8,
+        "greet": 9,
+        "hablar_humano": 10,
+        "nlu_fallback": 11,
+        "out_of_scope": 12,
+        "restart": 13,
+        "session_start": 14
+      },
+      "action_name": {
+        "action_listen": 0,
+        "action_restart": 1,
+        "action_session_start": 2,
+        "action_default_fallback": 3,
+        "action_deactivate_loop": 4,
+        "action_revert_fallback_events": 5,
+        "action_default_ask_affirmation": 6,
+        "action_default_ask_rephrase": 7,
+        "action_two_stage_fallback": 8,
+        "action_unlikely_intent": 9,
+        "action_back": 10,
+        "...": 11,
+        "action_extract_slots": 12,
+        "action_buscar_faq": 13,
+        "action_consultar_pedido": 14,
+        "action_crear_ticket": 15,
+        "action_guardar_conversacion": 16,
+        "utter_agradecer": 17,
+        "utter_ayuda": 18,
+        "utter_bot_challenge": 19,
+        "utter_default": 20,
+        "utter_escalar_ticket": 21,
+        "utter_goodbye": 22,
+        "utter_greet": 23,
+        "utter_iamabot": 24,
+        "utter_pedido_no_encontrado": 25,
+        "utter_pedir_pedido_id": 26,
+        "utter_ticket_creado": 27
+      },
+      "entities": {
+        "categoria_faq": 0,
+        "pedido_id": 1
+      },
+      "slots": {
+        "pedido_id_0": 0,
+        "cliente_id_0": 1,
+        "session_id_0": 2,
+        "requested_slot_0": 3
+      },
+      "active_loop": {}
+    }
+  },
+  "remove_duplicates": true,
+  "max_history": 5
+}

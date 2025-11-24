@@ -128,6 +128,8 @@ npm run build
 
 ### 4. Subir archivos a S3
 
+aws s3 rm s3://capstone-front-tahir-20251007211205/ --recursive
+
 ```bash
 aws s3 sync dist/ s3://capstone-front-tahir-20251007211205/ --delete
 ```

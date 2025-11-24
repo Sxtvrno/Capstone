@@ -63,6 +63,25 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
       ),
     },
     {
+      id: "pedidos",
+      label: "Pedidos",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+          />
+        </svg>
+      ),
+    },
+    {
       id: "tickets",
       label: "Tickets Soporte",
       icon: (
@@ -100,25 +119,7 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
         </svg>
       ),
     },
-    {
-      id: "pedidos",
-      label: "Pedidos",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 7.5l9-4.5 9 4.5M3 7.5l9 4.5 9-4.5M3 7.5v9l9 4.5 9-4.5v-9"
-          />
-        </svg>
-      ),
-    },
+
   ];
 
   return (
@@ -162,9 +163,8 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-200 transition-transform duration-300 ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-200 transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -194,11 +194,10 @@ function Sidebar({ vista, setVista, handleLogout, user }) {
                   setVista(item.id);
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                  vista === item.id
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${vista === item.id
                     ? "bg-blue-50 text-blue-600 shadow-sm"
                     : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 {item.icon}
                 <span>{item.label}</span>
