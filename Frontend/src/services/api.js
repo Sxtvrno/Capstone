@@ -1,11 +1,14 @@
 import axios from "axios";
 
 // Configuración base
+
+// Unificar variable de entorno para la URL base de la API
 export const API_URL =
+  import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_BACK_URL ||
   (window.location.hostname === "localhost"
     ? "http://localhost:8001"
-    : "https://d10nrn1yj450xr.cloudfront.net");
+    : "http://capstone-api-env.eba-u93fpfjr.us-east-1.elasticbeanstalk.com");
 
 // Configurar interceptor para agregar token automáticamente
 axios.interceptors.request.use(
@@ -777,30 +780,26 @@ export default {
   API_URL,
 };
 
+
 export async function getStoreConfig() {
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL}/api/public/store-config`
-  );
+  const res = await fetch(`${API_URL}/api/public/store-config`);
   if (!res.ok) throw new Error("Error obteniendo configuración de tienda");
   return await res.json();
 }
 
 export async function updateStoreConfig(cfg, token) {
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL}/api/admin/store-config`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        store_name: cfg.store_name,
-        logo_url: cfg.logo_url,
-        header_color: cfg.header_color,
-      }),
-    }
-  );
+  const res = await fetch(`${API_URL}/api/admin/store-config`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      store_name: cfg.store_name,
+      logo_url: cfg.logo_url,
+      header_color: cfg.header_color,
+    }),
+  });
   if (!res.ok) throw new Error("Error actualizando configuración");
   return await res.json();
 }

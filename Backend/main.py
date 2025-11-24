@@ -3407,7 +3407,20 @@ async def chatbot_message(
     import httpx
 
     sender_id = request.sender_id or str(datetime.now().timestamp())
-    rasa_url = os.getenv("RASA_URL", "http://localhost:5005/webhooks/rest/webhook")
+    import socket
+    def is_localhost_available():
+        try:
+            sock = socket.create_connection(("localhost", 5005), timeout=1)
+            sock.close()
+            return True
+        except Exception:
+            return False
+
+    default_local = "http://localhost:5005/webhooks/rest/webhook"
+    fallback = "http://physical-via.gl.at.ply.gg:18057/webhooks/rest/webhook"
+    rasa_url = os.getenv("RASA_URL", default_local)
+    if rasa_url == default_local and not is_localhost_available():
+        rasa_url = fallback
 
     # Construir metadata incluyendo cliente_id si el usuario está autenticado
     metadata = request.metadata.copy() if request.metadata else {}
