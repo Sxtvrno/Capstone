@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CartContext } from "../contexts/CartContext";
-import { productAPI } from "../services/api";
+import { productAPI, getStoreConfig } from "../services/api";
 
 export default function StoreTemplateA({
   products = [],
-  storeName = "Mi Tienda",
+  storeName: storeNameProp,
   logo,
   icon,
   logoSrc,
@@ -17,6 +17,18 @@ export default function StoreTemplateA({
   const [imagesMap, setImagesMap] = useState({});
   const [sortOrder, setSortOrder] = useState("nuevo");
   const [toast, setToast] = useState({ show: false, message: "" });
+  const [storeName, setStoreName] = useState(storeNameProp);
+
+  // Cargar configuración de tienda desde BD
+  useEffect(() => {
+    getStoreConfig()
+      .then((config) => {
+        if (config?.store_name) {
+          setStoreName(config.store_name);
+        }
+      })
+      .catch((err) => console.error("Error loading store config:", err));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,7 +211,10 @@ export default function StoreTemplateA({
                 : null;
             const formattedPrice =
               price != null
-                ? price.toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })
+                ? price.toLocaleString("es-CL", {
+                    style: "currency",
+                    currency: "CLP",
+                  })
                 : null;
 
             return (

@@ -8,7 +8,6 @@ import TicketManager from "../components/TicketManager";
 import OrderManager from "../components/OrderManager";
 import Sidebar from "../components/SideBar";
 import { authAPI } from "../services/api";
-import OrdersAdmin from "../components/OrdersAdmin";
 
 function AdminPage({ user, onLogout }) {
   const [vista, setVista] = useState("productos");
@@ -96,7 +95,6 @@ function AdminPage({ user, onLogout }) {
             {vista === "pedidos" && <OrderManager />}
             {vista === "tickets" && <TicketManager />}
             {vista === "personaliza" && <CustomizeStore />}
-            {vista === "pedidos" && <OrdersAdmin />}
           </div>
         </div>
       </main>

@@ -5,24 +5,20 @@ import EditProductForm from "./EditProductForm";
 
 export default function ProductList() {
   const navigate = useNavigate();
-  const [allProducts, setAllProducts] = useState([]); // Todos los productos
-  const [products, setProducts] = useState([]); // Productos filtrados/paginados
+  const [allProducts, setAllProducts] = useState([]);
+  const [products, setProducts] = useState([]);
   const [imagesMap, setImagesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
 
-  // Cargar todos los productos una sola vez al inicio
   useEffect(() => {
     fetchAllProducts();
   }, []);
 
-  // Aplicar filtros y paginación cuando cambien los criterios
   useEffect(() => {
     applyFilters();
   }, [currentPage, searchTerm, allProducts]);
@@ -34,7 +30,6 @@ export default function ProductList() {
       const data = await productAPI.getAll();
       setAllProducts(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Error al cargar productos:", err);
       setError("Error al cargar productos. Verifica tu sesión.");
       setAllProducts([]);
     } finally {
@@ -44,8 +39,6 @@ export default function ProductList() {
 
   const applyFilters = () => {
     let filtered = [...allProducts];
-
-    // Filtrar por búsqueda
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -55,23 +48,16 @@ export default function ProductList() {
           (p.description || "").toLowerCase().includes(searchLower)
       );
     }
-
-    // Aplicar paginación
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const paginated = filtered.slice(startIndex, endIndex);
-
-    setProducts(paginated);
+    setProducts(filtered.slice(startIndex, endIndex));
   };
 
-  // Cargar imágenes solo para productos visibles
   useEffect(() => {
     const loadImages = async () => {
       if (!Array.isArray(products) || products.length === 0) return;
-
       const ids = [...new Set(products.map((p) => p?.id).filter(Boolean))];
       const missing = ids.filter((id) => !imagesMap[id]);
-
       if (missing.length === 0) return;
 
       try {
@@ -79,44 +65,28 @@ export default function ProductList() {
           missing.map(async (id) => {
             try {
               const imgs = await productAPI.getImages(id);
-
-              if (!imgs || !Array.isArray(imgs)) {
-                return [id, []];
-              }
-
+              if (!imgs || !Array.isArray(imgs)) return [id, []];
               const urls = imgs
                 .map((it) => it.url_imagen || it.url || it.imagen || it.image)
                 .filter(Boolean);
-
               return [id, urls];
-            } catch (err) {
+            } catch {
               return [id, []];
             }
           })
         );
-
         setImagesMap((prev) => {
           const next = { ...prev };
-          for (const [id, urls] of results) {
-            next[id] = urls;
-          }
+          for (const [id, urls] of results) next[id] = urls;
           return next;
         });
-      } catch (err) {
-        console.error("Error cargando imágenes:", err);
-      }
+      } catch {}
     };
-
     loadImages();
-  }, [products]);
+  }, [products, imagesMap]);
 
   const handleDelete = async (id) => {
-    if (
-      !window.confirm("¿Estás seguro de que deseas eliminar este producto?")
-    ) {
-      return;
-    }
-
+    if (!window.confirm("¿Eliminar este producto?")) return;
     try {
       await productAPI.delete(id);
       setAllProducts((prev) => prev.filter((p) => p.id !== id));
@@ -125,51 +95,39 @@ export default function ProductList() {
         delete next[id];
         return next;
       });
-      alert("Producto eliminado exitosamente");
+      alert("Producto eliminado");
     } catch (err) {
-      alert("Error al eliminar el producto: " + err.message);
+      alert("Error al eliminar: " + err.message);
     }
   };
 
   const handleEdit = (product) => {
     if (!product || !product.id) {
-      console.error("Producto inválido:", product);
-      alert("Error: Producto inválido");
+      alert("Producto inválido");
       return;
     }
     setEditingProduct(product);
   };
 
-  const handleCancelEdit = () => {
-    setEditingProduct(null);
-  };
+  const handleCancelEdit = () => setEditingProduct(null);
 
   const handleSaveEdit = async (updatedProduct) => {
     try {
       await productAPI.update(updatedProduct.id, updatedProduct);
-
-      // Actualizar en la lista local
       setAllProducts((prev) =>
         prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
       );
-
       try {
         const imgs = await productAPI.getImages(updatedProduct.id);
         const urls = Array.isArray(imgs)
           ? imgs.map((it) => it.url_imagen || it.url).filter(Boolean)
           : [];
-        setImagesMap((prev) => ({
-          ...prev,
-          [updatedProduct.id]: urls,
-        }));
-      } catch (err) {
-        console.error("Error cargando imágenes:", err);
-      }
-
+        setImagesMap((prev) => ({ ...prev, [updatedProduct.id]: urls }));
+      } catch {}
       setEditingProduct(null);
-      alert("Producto actualizado exitosamente");
+      alert("Producto actualizado");
     } catch (err) {
-      alert("Error al actualizar el producto: " + err.message);
+      alert("Error al actualizar: " + err.message);
     }
   };
 
@@ -177,16 +135,13 @@ export default function ProductList() {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
   };
-
   const handleClearFilters = () => {
     setSearchTerm("");
     setCurrentPage(1);
   };
 
-  // Calcular productos filtrados
   const getFilteredProducts = () => {
     let filtered = [...allProducts];
-
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -196,7 +151,6 @@ export default function ProductList() {
           (p.description || "").toLowerCase().includes(searchLower)
       );
     }
-
     return filtered;
   };
 
@@ -209,14 +163,12 @@ export default function ProductList() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
-
   const handleNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
-
   const handlePageClick = (pageNumber) => {
     setCurrentPage(pageNumber);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -225,35 +177,29 @@ export default function ProductList() {
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
-
     if (totalPages <= maxPagesToShow) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else if (currentPage <= 3) {
+      for (let i = 1; i <= 4; i++) pages.push(i);
+      pages.push("...");
+      pages.push(totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(1);
+      pages.push("...");
+      for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
     } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1);
-        pages.push("...");
-        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push("...");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-        pages.push("...");
-        pages.push(totalPages);
-      }
+      pages.push(1);
+      pages.push("...");
+      for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+      pages.push("...");
+      pages.push(totalPages);
     }
-
     return pages;
   };
 
   if (editingProduct) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
         <EditProductForm
           product={editingProduct}
           onSave={handleSaveEdit}
@@ -265,10 +211,10 @@ export default function ProductList() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando productos...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">Cargando productos...</p>
         </div>
       </div>
     );
@@ -276,10 +222,10 @@ export default function ProductList() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
+      <div className="flex items-center justify-center py-16 px-4">
+        <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-red-200 w-full max-w-md">
           <svg
-            className="w-16 h-16 text-red-500 mx-auto mb-4"
+            className="w-14 h-14 text-red-500 mx-auto mb-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -291,10 +237,10 @@ export default function ProductList() {
               d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-gray-700 mb-4">{error}</p>
           <button
             onClick={fetchAllProducts}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             Reintentar
           </button>
@@ -304,11 +250,10 @@ export default function ProductList() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header con búsqueda */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-          <div className="flex-1 w-full">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-7">
+      <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex flex-col md:flex-row gap-5 md:items-center md:justify-between">
+          <div className="w-full md:max-w-md">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Buscar productos
             </label>
@@ -317,11 +262,11 @@ export default function ProductList() {
                 type="text"
                 value={searchTerm}
                 onChange={handleSearchChange}
-                placeholder="Buscar por título, SKU o descripción..."
-                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Título, SKU o descripción..."
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
               />
               <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -335,22 +280,10 @@ export default function ProductList() {
               </svg>
             </div>
           </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between text-sm">
-          <div className="flex items-center gap-4">
-            <span className="text-gray-600 font-medium">
-              Total: {allProducts.length} productos
-            </span>
-            <span className="text-gray-500">
-              Mostrando {filteredProducts.length} producto(s)
-              {totalPages > 0 && ` - Página ${currentPage} de ${totalPages}`}
-            </span>
-          </div>
           {searchTerm && (
             <button
               onClick={handleClearFilters}
-              className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
               <svg
                 className="w-4 h-4"
@@ -365,51 +298,63 @@ export default function ProductList() {
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              Limpiar búsqueda
+              Limpiar
             </button>
           )}
+        </div>
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-gray-700 font-medium">
+              Total: {allProducts.length}
+            </span>
+            <span className="text-gray-500">
+              Mostrando {filteredProducts.length}
+              {totalPages > 0 && ` • Página ${currentPage}/${totalPages}`}
+            </span>
+          </div>
         </div>
       </div>
 
       {products.length === 0 ? (
-        <div className="bg-white p-12 rounded-lg shadow-sm border border-gray-200 text-center">
-          <svg
-            className="w-16 h-16 text-gray-400 mx-auto mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-            />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No se encontraron productos
-          </h3>
-          <p className="text-gray-600 mb-4">
-            {searchTerm
-              ? "Intenta con otros términos de búsqueda"
-              : "Crea tu primer producto para comenzar"}
-          </p>
-          {searchTerm && (
-            <button
-              onClick={handleClearFilters}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        <div className="bg-white p-10 sm:p-14 rounded-xl shadow-sm border border-gray-200 text-center">
+          <div className="flex flex-col items-center">
+            <svg
+              className="w-20 h-20 text-gray-300 mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              Ver todos los productos
-            </button>
-          )}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No se encontraron productos
+            </h3>
+            <p className="text-gray-600 mb-5 max-w-sm">
+              {searchTerm
+                ? "Intenta con otros términos de búsqueda."
+                : "Crea tu primer producto para comenzar."}
+            </p>
+            {searchTerm && (
+              <button
+                onClick={handleClearFilters}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Ver todos
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 sm:gap-6">
             {products.map((product) => {
               const firstImage = imagesMap[product.id]?.[0];
               const imageCount = imagesMap[product.id]?.length || 0;
-
               const title = product.title || `Producto ${product.sku}`;
               const price = product.price || 0;
               const stock = product.stock_quantity || 0;
@@ -420,14 +365,15 @@ export default function ProductList() {
               return (
                 <article
                   key={product.id}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                  className="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow flex flex-col overflow-hidden"
                 >
-                  <div className="relative bg-gray-100 aspect-video">
+                  <div className="relative w-full bg-gray-100 overflow-hidden aspect-[4/3] sm:aspect-video">
                     {firstImage ? (
                       <img
                         src={firstImage}
                         alt={title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
                         onError={(e) => {
                           e.target.style.display = "none";
                         }}
@@ -435,7 +381,7 @@ export default function ProductList() {
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
                         <svg
-                          className="w-16 h-16 mb-2"
+                          className="w-14 h-14 mb-2"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -452,7 +398,7 @@ export default function ProductList() {
                     )}
 
                     {imageCount > 0 && (
-                      <div className="absolute top-2 left-2 bg-gray-900/75 text-white text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
+                      <div className="absolute top-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-white text-[10px] font-semibold flex items-center gap-1">
                         <svg
                           className="w-3 h-3"
                           fill="none"
@@ -471,40 +417,40 @@ export default function ProductList() {
                     )}
 
                     {stock > 0 && stock <= 5 && (
-                      <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                      <div className="absolute top-2 right-2 bg-yellow-500 text-white text-[11px] font-semibold px-2 py-1 rounded-md shadow">
                         Stock bajo: {stock}
                       </div>
                     )}
                     {stock === 0 && (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                      <div className="absolute top-2 right-2 bg-red-600 text-white text-[11px] font-semibold px-2 py-1 rounded-md shadow">
                         Sin stock
                       </div>
                     )}
                   </div>
 
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900 flex-1">
+                  <div className="flex flex-col flex-1 p-4">
+                    <div className="flex items-start justify-between mb-2 gap-2">
+                      <h3 className="text-sm sm:text-base font-semibold text-gray-900 line-clamp-2 leading-snug">
                         {title}
                       </h3>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">
                         {category}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 mb-2">SKU: {sku}</p>
+                    <p className="text-xs text-gray-500 mb-2">SKU: {sku}</p>
 
                     {description && (
-                      <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                      <p className="text-xs sm:text-sm text-gray-600 line-clamp-3 mb-3">
                         {description}
                       </p>
                     )}
 
-                    <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
+                    <div className="mt-auto mb-4 pb-4 border-b border-gray-200 flex items-center justify-between">
                       <div>
-                        <span className="text-xl font-bold text-gray-900">
+                        <span className="text-lg font-bold text-gray-900">
                           ${Number(price).toLocaleString("es-CL")}
                         </span>
-                        <span className="text-sm text-gray-500 ml-2">
+                        <span className="text-xs text-gray-500 ml-2">
                           Stock: {stock}
                         </span>
                       </div>
@@ -513,7 +459,7 @@ export default function ProductList() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleEdit(product)}
-                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <svg
                           className="w-4 h-4"
@@ -532,7 +478,7 @@ export default function ProductList() {
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                        className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <svg
                           className="w-4 h-4"
@@ -557,30 +503,51 @@ export default function ProductList() {
           </div>
 
           {totalPages > 1 && (
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={handlePreviousPage}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+            <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  Anterior
-                </button>
-
-                <div className="flex items-center gap-2">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                    Anterior
+                  </button>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                  >
+                    Siguiente
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
                   {getPageNumbers().map((page, index) =>
                     page === "..." ? (
                       <span
@@ -593,9 +560,9 @@ export default function ProductList() {
                       <button
                         key={page}
                         onClick={() => handlePageClick(page)}
-                        className={`px-4 py-2 rounded-lg transition-colors ${
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           currentPage === page
-                            ? "bg-blue-600 text-white"
+                            ? "bg-blue-600 text-white shadow"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                         }`}
                       >
@@ -604,27 +571,6 @@ export default function ProductList() {
                     )
                   )}
                 </div>
-
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  Siguiente
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
               </div>
             </div>
           )}
